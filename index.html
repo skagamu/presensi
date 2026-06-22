@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFID SMK GM 1 Wuryantoro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        :root {
+            --bg-main: #f8fafc;
+            --accent: #2563eb;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+        }
+
+        body { 
+            background-color: var(--bg-main);
+            color: var(--text-dark); 
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 4rem;
+        }
+
+        .main-container {
+            width: 100%;
+            height: 100%;
+            max-width: 1500px;
+            max-height: 90vh; 
+            display: grid;
+            grid-template-columns: 1fr 420px; 
+            grid-template-rows: auto 1fr;
+            gap: 2.5rem;
+        }
+
+        .header-area {
+            grid-column: 1 / span 2;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .premium-card {
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 3.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            height: 100%;
+        }
+
+        .status-success {
+            border-color: #10b981 !important;
+            background-color: #f0fdf4;
+            box-shadow: 0 0 80px rgba(16, 185, 129, 0.1);
+        }
+
+        .status-error {
+            border-color: #ef4444 !important;
+            background-color: #fef2f2;
+            box-shadow: 0 0 80px rgba(239, 68, 68, 0.1);
+        }
+
+        .side-log-panel {
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+
+        .log-container {
+            flex-grow: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-item {
+            flex-shrink: 0;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            background: #f1f5f9;
+            border-left: 4px solid var(--accent);
+            border-radius: 0 0.75rem 0.75rem 0;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .log-item.success { border-left-color: #10b981; }
+        .log-item.error { border-left-color: #ef4444; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        #rfidInput {
+            position: fixed;
+            top: -100px;
+            left: -100px;
+            opacity: 0;
+        }
+
+        .clock-display {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        /* ===================== GREETING OVERLAY ===================== */
+        #greetingOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        #greetingOverlay.visible {
+            pointer-events: all;
+            opacity: 1;
+            transition: opacity 0.4s ease;
+        }
+
+        /* Backdrop blur */
+        .overlay-backdrop {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(15, 23, 42, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            opacity: 0;
+            transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #greetingOverlay.visible .overlay-backdrop {
+            opacity: 1;
+        }
+
+        /* Main greeting card */
+        .greeting-card {
+            position: relative;
+            z-index: 10;
+            border-radius: 2.5rem;
+            padding: 2.5rem 3.5rem;
+            text-align: center;
+            min-width: 500px;
+            max-width: 620px;
+            transform: scale(0.65) translateY(60px) rotate(-2deg);
+            opacity: 0;
+            transition: transform 0.8s cubic-bezier(0.34, 1.76, 0.64, 1), opacity 0.6s ease;
+            box-shadow: 0 30px 60px -10px rgba(0,0,0,0.5), 0 0 50px rgba(255,255,255,0.05);
+            overflow: hidden;
+        }
+
+        #greetingOverlay.visible .greeting-card {
+            transform: scale(1) translateY(0) rotate(0deg);
+            opacity: 1;
+        }
+
+        #greetingOverlay.hiding .greeting-card {
+            transform: scale(0.8) translateY(-80px) rotate(2deg);
+            opacity: 0;
+            transition: transform 0.5s cubic-bezier(0.3, 0.05, 0.1, 1), opacity 0.4s ease-in;
+        }
+
+        #greetingOverlay.hiding .overlay-backdrop {
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
+        }
+
+        /* DATANG theme: fresh emerald glow */
+        .greeting-card.theme-datang {
+            background: linear-gradient(135deg, #022c22 0%, #064e3b 45%, #0f766e 100%);
+            border: 2px solid rgba(52, 211, 153, 0.5);
+            box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 100px rgba(16, 185, 129, 0.25);
+        }
+
+        /* PULANG theme: deep sunset twilight glow */
+        .greeting-card.theme-pulang {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 45%, #4c1d95 100%);
+            border: 2px solid rgba(167, 139, 250, 0.5);
+            box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 100px rgba(139, 92, 246, 0.25);
+        }
+
+        /* ERROR theme: deep crimson glow */
+        .greeting-card.theme-error {
+            background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 60%, #991b1b 100%);
+            border: 2px solid rgba(248, 113, 113, 0.4);
+            box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 100px rgba(239, 68, 68, 0.25);
+        }
+
+        .greeting-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1.2rem;
+            border-radius: 999px;
+            font-size: 0.6rem;
+            font-weight: 800;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            margin-bottom: 1.2rem;
+        }
+
+        .theme-datang .greeting-status-badge {
+            background: rgba(52, 211, 153, 0.2);
+            color: #6ee7b7;
+            border: 1px solid rgba(52, 211, 153, 0.4);
+        }
+
+        .theme-pulang .greeting-status-badge {
+            background: rgba(167, 139, 250, 0.2);
+            color: #c4b5fd;
+            border: 1px solid rgba(167, 139, 250, 0.4);
+        }
+
+        .theme-error .greeting-status-badge {
+            background: rgba(252, 165, 165, 0.15);
+            color: #fca5a5;
+            border: 1px solid rgba(252, 165, 165, 0.3);
+        }
+
+        .status-dot-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        .theme-datang .status-dot-pulse { background: #34d399; }
+        .theme-pulang .status-dot-pulse { background: #a78bfa; }
+        .theme-error .status-dot-pulse { background: #f87171; }
+
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.6; }
+        }
+
+        .greeting-icon {
+            font-size: 3.5rem;
+            line-height: 1;
+            margin-bottom: 1rem;
+            display: inline-block;
+            animation: popSpinIn 0.8s cubic-bezier(0.34, 1.76, 0.64, 1) 0.15s both, floatIcon 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes popSpinIn {
+            from { transform: scale(0) rotate(-180deg); opacity: 0; }
+            to { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        @keyframes floatIcon {
+            0% { transform: translateY(0px) rotate(-3deg); }
+            100% { transform: translateY(-12px) rotate(3deg); }
+        }
+
+        .greeting-name {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.4rem;
+            text-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .greeting-role {
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+            color: #a7f3d0;
+        }
+
+        .theme-pulang .greeting-role {
+            color: #ddd6fe;
+        }
+
+        .theme-error .greeting-role {
+            color: #fecaca;
+        }
+
+        .greeting-message {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.95);
+            line-height: 1.5;
+            max-width: 420px;
+            margin: 0 auto 1.5rem;
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(5px);
+            border-radius: 1.2rem;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: inset 0 2px 10px rgba(255,255,255,0.05);
+        }
+
+        @keyframes slideUpFade {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .greeting-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.45);
+            letter-spacing: 0.15em;
+            margin-bottom: 1.2rem;
+        }
+
+        /* Progress bar */
+        .greeting-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .greeting-progress-bar {
+            height: 100%;
+            border-radius: 999px;
+            width: 100%;
+            transform-origin: left;
+            transform: scaleX(1);
+            transition: transform linear;
+        }
+
+        .theme-datang .greeting-progress-bar { background: linear-gradient(90deg, #34d399, #6ee7b7); }
+        .theme-pulang .greeting-progress-bar { background: linear-gradient(90deg, #a78bfa, #c4b5fd); }
+        .theme-error .greeting-progress-bar { background: linear-gradient(90deg, #f87171, #fca5a5); }
+
+        /* ===================== CONFETTI ===================== */
+        #confettiCanvas {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            pointer-events: none;
+        }
+
+        /* ===================== GLOW RINGS ===================== */
+        .glow-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid;
+            animation: expandRing 1s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes expandRing {
+            from { transform: translate(-50%, -50%) scale(0); opacity: 0.8; }
+            to { transform: translate(-50%, -50%) scale(4); opacity: 0; }
+        }
+    </style>
+</head>
+<body onclick="forceFocus()">
+
+    <div class="main-container">
+        
+        <!-- Header -->
+        <header class="header-area">
+            <div>
+                <h1 class="text-2xl font-800 tracking-tight text-slate-900 uppercase">
+                    SMK <span class="text-blue-600">GAJAH MUNGKUR 1</span>
+                </h1>
+                <p class="text-[10px] font-bold text-slate-400 tracking-[0.4em] uppercase mt-1 italic">Presensi Digital Terintegrasi</p>
+            </div>
+            <div class="flex items-center space-x-10">
+                <div id="clock" class="clock-display text-6xl font-800 tracking-tighter">00:00:00</div>
+                <div class="flex flex-col items-end">
+                    <div class="flex items-center space-x-2 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 mb-1">
+                        <span id="statusServerDot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span class="text-[9px] font-900 tracking-widest text-emerald-700 uppercase">Online</span>
+                    </div>
+                    <span id="dbStats" class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Syncing...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Kiri: Area Scanner Utama -->
+        <main class="h-full">
+            <div id="displayCard" class="premium-card">
+                <div class="space-y-8 p-12">
+                    <div id="labelTop" class="text-slate-400 text-xs font-bold tracking-[0.8em] uppercase">
+                        Silahkan Tap Kartu RFID
+                    </div>
+                    
+                    <h2 id="nameMain" class="text-6xl font-800 text-slate-900 leading-tight tracking-tight transition-all duration-500 max-w-2xl">
+                        READY
+                    </h2>
+                    
+                    <div id="idSub" class="inline-block px-6 py-2 bg-slate-100 rounded-lg text-slate-400 font-mono text-lg tracking-[0.3em] uppercase">
+                        ID: ————————
+                    </div>
+                </div>
+                <input type="text" id="rfidInput" autocomplete="off" autofocus inputmode="none">
+            </div>
+        </main>
+
+        <!-- Kanan: Panel Aktivitas Terakhir -->
+        <aside class="side-log-panel">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 class="text-[10px] font-900 tracking-[0.2em] text-slate-500 uppercase">Log Aktivitas Terbaru</h3>
+                <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+            </div>
+            
+            <div id="logList" class="log-container">
+                <div id="emptyMsg" class="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center my-auto px-8 leading-relaxed opacity-60">
+                    Menunggu aktivitas pemindaian kartu...
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- ===================== GREETING OVERLAY ===================== -->
+
+    <div id="greetingOverlay">
+        <div class="overlay-backdrop"></div>
+        <div id="greetingCard" class="greeting-card">
+            <div id="greetingBadge" class="greeting-status-badge">
+                <span class="status-dot-pulse"></span>
+                <span id="greetingBadgeText">DATANG</span>
+            </div>
+            <div id="greetingIcon" class="greeting-icon">👋</div>
+            <div id="greetingName" class="greeting-name">NAMA SISWA</div>
+            <div id="greetingRole" class="greeting-role">SISWA</div>
+            <div id="greetingMessage" class="greeting-message">Pesan ucapan</div>
+            <div id="greetingTime" class="greeting-time">--:--:--</div>
+            <div class="greeting-progress">
+                <div id="greetingProgressBar" class="greeting-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbycrLlUiETE6rBBnZNIoa7GoA-W-9Pzko3UUkmccvgLdSe8sXOGxpbY91EanUF-CtLX/exec";
+        
+        let database = JSON.parse(localStorage.getItem('gm1_db_v13') || "{}");
+        let queue = JSON.parse(localStorage.getItem('gm1_queue_v13') || "[]");
+        const rfidInput = document.getElementById('rfidInput');
+        let autoSubmitTimeout;
+
+        const lastScannedTime = {};
+        const COOLDOWN_MS = 3000;
+
+        function forceFocus() { rfidInput.focus(); }
+
+        rfidInput.addEventListener('input', (e) => {
+            clearTimeout(autoSubmitTimeout);
+            const val = rfidInput.value.trim();
+            if (val.length >= 10) {
+                processScan(val);
+                rfidInput.value = "";
+            } else if (val.length > 0) {
+                autoSubmitTimeout = setTimeout(() => {
+                    processScan(rfidInput.value.trim());
+                    rfidInput.value = "";
+                }, 400); 
+            }
+        });
+
+        setInterval(forceFocus, 1000);
+
+        function processScan(id) {
+            if (!id) return;
+            const cleanId = id.toString().trim();
+
+            const now = Date.now();
+            if (lastScannedTime[cleanId] && (now - lastScannedTime[cleanId] < COOLDOWN_MS)) {
+                rfidInput.value = "";
+                return;
+            }
+            lastScannedTime[cleanId] = now;
+
+            const user = database[cleanId];
+            const isSuccess = !!user;
+            const nama = isSuccess ? user.nama : "ID TIDAK TERDAFTAR";
+            const peran = isSuccess ? user.peran : "TAMU";
+
+            // Deteksi Status tap ke-1 = DATANG, tap ke-2 dst = PULANG
+            let currentStatus = "DATANG";
+            
+            const todayKey = new Date().toDateString();
+            const localUserHistoryKey = `scan_${cleanId}_${todayKey}`;
+            const hasScannedToday = localStorage.getItem(localUserHistoryKey);
+
+            if (hasScannedToday) {
+                currentStatus = "PULANG";
+            } else {
+                localStorage.setItem(localUserHistoryKey, "true");
+            }
+
+            updateUI(nama, cleanId, isSuccess, peran, currentStatus);
+            addLog(cleanId, nama, isSuccess, peran, currentStatus);
+
+            queue.push({
+                rfid_id: "'" + cleanId,
+                name: isSuccess ? nama : "Tamu/Asing",
+                peran: peran,
+                timestamp: new Date().toLocaleString('id-ID'),
+                terminal: "TV-LIGHT-V3"
+            });
+            localStorage.setItem('gm1_queue_v13', JSON.stringify(queue));
+            
+            setTimeout(syncQueue, 10);
+        }
+
+        // ===================== GREETING OVERLAY LOGIC =====================
+        let greetingTimeout = null;
+        let dismissTimeout = null;
+        let cardResetTimeout = null;
+        let progressAnimFrame = null;
+
+        const GREETING_DURATION = 5000; // 5 detik
+
+        const greetingData = {
+            DATANG: {
+                GURU: {
+                    icons: ['🌟', '☀️', '🎓', '💪'],
+                    messages: [
+                        'Selamat datang, Guru! Semangat mendidik generasi bangsa hari ini!',
+                        'Terima kasih telah hadir. Kelas menanti inspirasi dari Anda!',
+                        'Kehadiran Anda adalah motivasi terbesar para siswa. Selamat mengajar!'
+                    ]
+                },
+                SISWA: {
+                    icons: ['🚀', '⚡', '🔥', '💡', '🌈'],
+                    messages: [
+                        'Semangat belajar hari ini! Ilmu yang kamu raih adalah investasi terbaik.',
+                        'Halo! Kamu sudah hadir, itu langkah pertama menuju sukses. Yuk belajar!',
+                        'Kehadiranmu membuat kelas makin bersemangat! Selamat belajar!',
+                        'Hari yang baru, semangat yang baru! Siap meraih prestasi hari ini?'
+                    ]
+                }
+            },
+            PULANG: {
+                GURU: {
+                    icons: ['✨', '🏠', '🌙', '💐'],
+                    messages: [
+                        'Terima kasih atas dedikasi luar biasa Anda hari ini. Selamat beristirahat!',
+                        'Ilmu yang Anda bagikan hari ini telah menyalakan cahaya bagi banyak siswa.',
+                        'Pulang dengan bangga! Tugas mulia Anda hari ini telah terselesaikan.'
+                    ]
+                },
+                SISWA: {
+                    icons: ['🏡', '🌅', '🎒', '⭐'],
+                    messages: [
+                        'Kerja bagus hari ini! Hati-hati di jalan pulang ya!',
+                        'Semoga ilmu hari ini bermanfaat. Sampai jumpa esok hari!',
+                        'Pulang dengan selamat! Istirahat yang cukup untuk belajar lebih giat esok.',
+                        'Hari yang produktif! Kamu sudah melakukan yang terbaik hari ini.'
+                    ]
+                }
+            }
+        };
+
+        function randomFrom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function showGreetingOverlay(nama, id, success, peran, status) {
+            const overlay = document.getElementById('greetingOverlay');
+            const card = document.getElementById('greetingCard');
+            const badgeText = document.getElementById('greetingBadgeText');
+            const icon = document.getElementById('greetingIcon');
+            const nameEl = document.getElementById('greetingName');
+            const roleEl = document.getElementById('greetingRole');
+            const msgEl = document.getElementById('greetingMessage');
+            const timeEl = document.getElementById('greetingTime');
+            const bar = document.getElementById('greetingProgressBar');
+
+            // Reset any active timeouts/frames immediately for new card tap
+            clearTimeout(greetingTimeout);
+            clearTimeout(dismissTimeout);
+            cancelAnimationFrame(progressAnimFrame);
+            
+            overlay.classList.remove('visible', 'hiding');
+            card.className = 'greeting-card';
+
+            if (!success) {
+                card.classList.add('theme-error');
+                badgeText.textContent = 'TIDAK TERDAFTAR';
+                icon.textContent = '⚠️';
+                nameEl.textContent = id;
+                roleEl.textContent = 'KARTU TIDAK DIKENAL';
+                msgEl.textContent = 'Kartu RFID Anda belum terdaftar di sistem. Silakan hubungi admin atau operator.';
+            } else {
+                const peranKey = (peran === 'GURU') ? 'GURU' : 'SISWA';
+                const statusKey = status; // DATANG or PULANG
+                const theme = (status === 'DATANG') ? 'theme-datang' : 'theme-pulang';
+                card.classList.add(theme);
+
+                const pool = greetingData[statusKey][peranKey];
+                const chosenIcon = randomFrom(pool.icons);
+                const chosenMsg = randomFrom(pool.messages);
+
+                badgeText.textContent = 'PRESENSI TERCATAT';
+                icon.textContent = chosenIcon;
+                nameEl.textContent = nama.toUpperCase();
+                roleEl.textContent = peran;
+                msgEl.textContent = chosenMsg;
+            }
+
+            timeEl.textContent = new Date().toLocaleTimeString('id-ID', {hour12: false});
+
+            // Show overlay
+            void overlay.offsetWidth; // force reflow
+            overlay.classList.add('visible');
+
+            // Progress bar
+            bar.style.transition = 'none';
+            bar.style.transform = 'scaleX(1)';
+            void bar.offsetWidth;
+            bar.style.transition = `transform ${GREETING_DURATION}ms linear`;
+            bar.style.transform = 'scaleX(0)';
+
+            // Auto-dismiss
+            greetingTimeout = setTimeout(() => {
+                overlay.classList.add('hiding');
+                dismissTimeout = setTimeout(() => {
+                    overlay.classList.remove('visible', 'hiding');
+                }, 450);
+            }, GREETING_DURATION);
+        }
+
+        function updateUI(nama, id, success, peran, status) {
+            const card = document.getElementById('displayCard');
+            const nameH = document.getElementById('nameMain');
+            const label = document.getElementById('labelTop');
+            const sub = document.getElementById('idSub');
+
+            // Reset scanner card active classes from previous tap
+            clearTimeout(cardResetTimeout);
+            card.classList.remove('status-success', 'status-error');
+
+            nameH.innerText = nama;
+            sub.innerText = `ID: ${id} [${peran}]`;
+            
+            if (success) {
+                card.classList.add('status-success');
+                label.innerText = 'PRESENSI TERCATAT';
+                label.className = "text-emerald-600 text-sm font-bold tracking-wide uppercase px-6 text-center";
+            } else {
+                card.classList.add('status-error');
+                label.innerText = "KARTU RFID ANDA BELUM TERDAFTAR DI SISTEM";
+                label.className = "text-rose-600 text-xs font-bold tracking-wider uppercase";
+            }
+
+            // Show the big overlay (internally resets its own timers)
+            showGreetingOverlay(nama, id, success, peran, status);
+
+            cardResetTimeout = setTimeout(() => {
+                card.classList.remove('status-success', 'status-error');
+                nameH.innerText = "READY";
+                sub.innerText = "ID: ————————";
+                label.innerText = "Silahkan Tap Kartu RFID";
+                label.className = "text-slate-400 text-xs font-bold tracking-[0.8em] uppercase";
+            }, GREETING_DURATION + 500);
+        }
+
+        // Cleaned up particles engine to keep the UI strictly professional.
+
+        function addLog(id, nama, success, peran, status) {
+            const list = document.getElementById('logList');
+            const empty = document.getElementById('emptyMsg');
+            if (empty) empty.remove();
+
+            const item = document.createElement('div');
+            item.className = `log-item ${success ? 'success' : 'error'}`;
+            
+            const statusLabel = success ? `(${status})` : "";
+            item.innerHTML = `
+                <div class="flex flex-col min-w-0">
+                    <span class="text-slate-900 font-bold text-[13px] truncate uppercase">${nama}</span>
+                    <span class="text-[9px] font-mono text-slate-400 tracking-tight">${id} · ${peran} ${statusLabel}</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[11px] font-800 text-slate-500">${new Date().toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'})}</span>
+                </div>
+            `;
+            
+            list.prepend(item);
+            if (list.children.length > 15) list.lastElementChild.remove();
+        }
+
+        let isSyncing = false;
+        async function syncQueue() {
+            if (queue.length === 0 || !navigator.onLine || isSyncing) return;
+            isSyncing = true;
+            try {
+                const data = queue[0];
+                fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
+                
+                queue.shift();
+                localStorage.setItem('gm1_queue_v13', JSON.stringify(queue));
+                isSyncing = false;
+                
+                if (queue.length > 0) {
+                    setTimeout(syncQueue, 200);
+                }
+            } catch (e) {
+                isSyncing = false;
+            }
+        }
+
+        async function fetchDatabase() {
+            if (!navigator.onLine) return;
+            try {
+                const res = await fetch(`${API_URL}?action=getDatabase&_=${Date.now()}`);
+                const data = await res.json();
+                const freshDb = {};
+                data.forEach(r => { 
+                    if(r[0]) {
+                        freshDb[r[0].toString().trim()] = {
+                            nama: r[1],
+                            peran: r[2] || "SISWA"
+                        };
+                    }
+                });
+                database = freshDb;
+                localStorage.setItem('gm1_db_v13', JSON.stringify(database));
+                document.getElementById('dbStats').innerText = `${Object.keys(database).length} USER TERDAFTAR`;
+            } catch (e) {}
+        }
+
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID', {hour12:false});
+            if (navigator.onLine) syncQueue();
+        }, 1000);
+
+        window.onload = () => {
+            fetchDatabase();
+            forceFocus();
+            setInterval(fetchDatabase, 300000);
+        };
+    </script>
+</body>
+</html>

@@ -736,16 +736,24 @@
             isSyncing = true;
             try {
                 const data = queue[0];
-                fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
-                
-                queue.shift();
-                localStorage.setItem('gm1_queue_v13', JSON.stringify(queue));
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+
+                // Hanya hapus dari queue jika server berhasil merespon
+                if (res.ok) {
+                    queue.shift();
+                    localStorage.setItem('gm1_queue_v13', JSON.stringify(queue));
+                }
+
                 isSyncing = false;
                 
                 if (queue.length > 0) {
                     setTimeout(syncQueue, 200);
                 }
             } catch (e) {
+                // Fetch gagal (offline/error) — data tetap aman di localStorage
                 isSyncing = false;
             }
         }

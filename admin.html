@@ -564,7 +564,7 @@ async function loadPresensi() {
             nama      : (r[COL_NAMA]      || '').toString().trim(),
             peran     : (r[COL_PERAN]     || 'SISWA').toString().trim().toUpperCase(),
             status    : (r[COL_STATUS]    || 'DATANG').toString().trim().toUpperCase()
-        })).filter(p => p.timestamp); // buang baris kosong
+        })).filter(p => p.timestamp).reverse(); // terbaru di atas
 
         filteredPresensi = [...allPresensi];
         presensiPage = 1;

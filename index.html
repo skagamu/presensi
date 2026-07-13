@@ -554,6 +554,14 @@
                         'Kehadiran Anda adalah motivasi terbesar para siswa. Selamat mengajar!'
                     ]
                 },
+                'STAF TU': {
+                    icons: ['🏢', '📋', '💼', '🌟'],
+                    messages: [
+                        'Selamat datang! Terima kasih atas dedikasi Anda mengelola administrasi sekolah.',
+                        'Selamat pagi! Semangat menjalankan tugas administrasi hari ini!',
+                        'Kehadiran Anda sangat penting untuk kelancaran operasional sekolah. Terima kasih!'
+                    ]
+                },
                 SISWA: {
                     icons: ['🚀', '⚡', '🔥', '💡', '🌈'],
                     messages: [
@@ -571,6 +579,14 @@
                         'Terima kasih atas dedikasi luar biasa Anda hari ini. Selamat beristirahat!',
                         'Ilmu yang Anda bagikan hari ini telah menyalakan cahaya bagi banyak siswa.',
                         'Pulang dengan bangga! Tugas mulia Anda hari ini telah terselesaikan.'
+                    ]
+                },
+                'STAF TU': {
+                    icons: ['✨', '🏠', '🌙', '🎉'],
+                    messages: [
+                        'Terima kasih atas kerja keras Anda hari ini. Selamat beristirahat!',
+                        'Administrasi sekolah berjalan lancar berkat Anda. Pulang dengan tenang!',
+                        'Tugas hari ini sudah selesai dengan baik. Sampai jumpa esok hari!'
                     ]
                 },
                 SISWA: {
@@ -616,7 +632,7 @@
                 roleEl.textContent = 'KARTU TIDAK DIKENAL';
                 msgEl.textContent = 'Kartu RFID Anda belum terdaftar di sistem. Silakan hubungi admin atau operator.';
             } else {
-                const peranKey = (peran === 'GURU') ? 'GURU' : 'SISWA';
+                const peranKey = (peran === 'GURU') ? 'GURU' : (peran === 'STAF TU') ? 'STAF TU' : 'SISWA';
                 const statusKey = status; // DATANG or PULANG
                 const theme = (status === 'DATANG') ? 'theme-datang' : 'theme-pulang';
                 card.classList.add(theme);

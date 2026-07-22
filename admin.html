@@ -349,7 +349,7 @@
                 <span id="periodLabel">–</span>
                 <button onclick="nextPeriod()" title="Periode berikutnya">›</button>
             </div>
-            <button class="btn btn-success btn-sm" onclick="exportRekapCSV()">⬇️ Export CSV</button>
+            <button class="btn btn-success btn-sm" onclick="exportRekapXLSX()">⬇️ Export XLSX</button>
             <span id="rekapInfo" style="font-size:0.72rem;color:var(--text-muted);font-weight:600"></span>
         </div>
         <div class="section-card">
@@ -449,6 +449,7 @@
 
 <div id="toastContainer"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════
 // CONFIG — Ganti URL jika sudah deploy script baru
@@ -990,8 +991,22 @@ function renderRekap() {
 }
 
 // ═══════════════════════════════════════════════════════
-// EXPORT CSV
+// EXPORT CSV & XLSX
 // ═══════════════════════════════════════════════════════
+function getDuration(datang, pulang) {
+    if (!datang || !pulang || datang === '—' || pulang === '—' || datang === 'Hadir' || pulang === 'Hadir') return '-';
+    let [h1, m1] = datang.split(':').map(Number);
+    let [h2, m2] = pulang.split(':').map(Number);
+    if (isNaN(h1) || isNaN(m1) || isNaN(h2) || isNaN(m2)) return '-';
+    let d1 = h1 * 60 + m1;
+    let d2 = h2 * 60 + m2;
+    let diff = d2 - d1;
+    if (diff < 0) return '-';
+    let hrs = Math.floor(diff / 60);
+    let mins = diff % 60;
+    return `${hrs}j ${mins}m`;
+}
+
 function exportCSV(type) {
     let rows, filename;
     if (type === 'presensi') {
@@ -1008,17 +1023,64 @@ function exportCSV(type) {
     downloadCSV(rows, filename);
 }
 
-function exportRekapCSV() {
+function exportRekapXLSX() {
+    if (typeof XLSX === 'undefined') {
+        showToast('Library Excel sedang dimuat, tunggu sebentar...', 'warning');
+        return;
+    }
+    
     const dates    = getPeriodDates();
     const today    = new Date();
     const HARI     = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
     const students = [...allDatabase].sort((a,b) => a.nama.localeCompare(b.nama));
 
-    const header = ['No','Nama','RFID',
+    // SHEET 1: DETAIL HARIAN
+    const detailRows = [];
+    detailRows.push(['No', 'Nama Lengkap', 'RFID ID', 'Peran', 'Tanggal', 'Status Hari', 'Jam Datang', 'Jam Pulang', 'Durasi']);
+    
+    let no = 1;
+    students.forEach(s => {
+        dates.forEach(d => {
+            if (d > today) return; // Skip future dates
+            const k = dateToKey(d);
+            const isWknd = isWeekend(d);
+            
+            let statusHari = '';
+            let jamDatang = '-';
+            let jamPulang = '-';
+            let durasi = '-';
+
+            if (isWknd) {
+                statusHari = 'Libur';
+            } else {
+                const dayMap = attendanceMap.get(k);
+                const times = dayMap ? dayMap.get(s.rfid) : null;
+                
+                if (times) {
+                    statusHari = 'Hadir';
+                    jamDatang = times.datang;
+                    jamPulang = times.pulang;
+                    durasi = getDuration(jamDatang, jamPulang);
+                } else {
+                    statusHari = 'Tidak Hadir';
+                }
+            }
+            
+            detailRows.push([no++, s.nama, s.rfid, s.peran, k, statusHari, jamDatang, jamPulang, durasi]);
+        });
+    });
+
+    const wsDetail = XLSX.utils.aoa_to_sheet(detailRows);
+    wsDetail['!cols'] = [{wch:5}, {wch:25}, {wch:15}, {wch:10}, {wch:12}, {wch:15}, {wch:12}, {wch:12}, {wch:10}];
+
+    // SHEET 2: REKAP MATRIKS
+    const headerMatriks = ['No', 'Nama Lengkap', 'RFID ID', 'Peran', 
         ...dates.map(d => `${HARI[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`),
-        'Hadir','Total Hari Kerja','%'
+        'Hadir', 'Total Hari Kerja', '%'
     ];
-    const rows = [header, ...students.map((s, idx) => {
+    
+    const matriksRows = [headerMatriks];
+    students.forEach((s, idx) => {
         let hadir = 0;
         const cells = dates.map(d => {
             if (isWeekend(d)) return 'LIBUR';
@@ -1029,15 +1091,22 @@ function exportRekapCSV() {
             return h ? 'Hadir' : 'Tidak Hadir';
         });
         const pastWork = dates.filter(d => !isWeekend(d) && d <= today).length;
-        const pct = pastWork > 0 ? Math.round(hadir/pastWork*100) : 0;
-        return [idx+1, s.nama, s.rfid, ...cells, hadir, pastWork, `${pct}%`];
-    })];
+        const pct = pastWork > 0 ? Math.round((hadir/pastWork)*100) : 0;
+        matriksRows.push([idx+1, s.nama, s.rfid, s.peran, ...cells, hadir, pastWork, `${pct}%`]);
+    });
+
+    const wsMatriks = XLSX.utils.aoa_to_sheet(matriksRows);
+    wsMatriks['!cols'] = [{wch:5}, {wch:25}, {wch:15}, {wch:10}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsDetail, "Detail Harian");
+    XLSX.utils.book_append_sheet(wb, wsMatriks, "Rekap Matriks");
 
     const label = rekapMode === 'mingguan'
         ? `minggu_${fileDate()}`
         : `${rekapDate.getMonth()+1}_${rekapDate.getFullYear()}`;
-    downloadCSV(rows, `rekap_${label}.csv`);
-    showToast('File rekap berhasil diunduh', 'success');
+    XLSX.writeFile(wb, `rekap_presensi_${label}.xlsx`);
+    showToast('File rekap XLSX berhasil diunduh', 'success');
 }
 
 function downloadCSV(rows, filename) {

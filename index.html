@@ -912,36 +912,92 @@
             Isya: "18:52"
         };
 
-        async function fetchPrayerTimes() {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const cacheKey = `prayer_wonogiri_${todayStr}`;
-            const cached = localStorage.getItem(cacheKey);
-
-            if (cached) {
-                try {
-                    prayerTimes = JSON.parse(cached);
-                    updatePrayerUI();
-                    return;
-                } catch(e) {}
-            }
-
+        // Kalkulator Astronomi Waktu Sholat Presisi Kemenag RI (100% Offline)
+        function calculateWonogiriPrayerTimes(date) {
             try {
-                const res = await fetch(`https://api.aladhan.com/v1/timingsByCity?city=Wonogiri&country=Indonesia&method=20`);
-                const json = await res.json();
-                if (json && json.data && json.data.timings) {
-                    const t = json.data.timings;
-                    prayerTimes = {
-                        Subuh: t.Fajr.substring(0, 5),
-                        Dzuhur: t.Dhuhr.substring(0, 5),
-                        Ashar: t.Asr.substring(0, 5),
-                        Maghrib: t.Maghrib.substring(0, 5),
-                        Isya: t.Isha.substring(0, 5)
-                    };
-                    localStorage.setItem(cacheKey, JSON.stringify(prayerTimes));
-                    updatePrayerUI();
+                const lat = -7.8181;  // Lintang Wonogiri
+                const lng = 110.9255; // Bujur Wonogiri
+                const timezone = 7;   // WIB (UTC+7)
+                
+                const year = date.getFullYear();
+                const month = date.getMonth() + 1;
+                const day = date.getDate();
+                
+                const a = Math.floor((14 - month) / 12);
+                const y = year + 4800 - a;
+                const m = month + 12 * a - 3;
+                const jd = day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045 - 0.5;
+                const d = jd - 2451545.0;
+                
+                const g = (357.529 + 0.98560028 * d) % 360;
+                const q = (280.459 + 0.98564736 * d) % 360;
+                const L = (q + 1.915 * Math.sin(g * Math.PI / 180) + 0.020 * Math.sin(2 * g * Math.PI / 180)) % 360;
+                const e = 23.439 - 0.00000036 * d;
+                
+                const ra = Math.atan2(Math.cos(e * Math.PI / 180) * Math.sin(L * Math.PI / 180), Math.cos(L * Math.PI / 180)) * 180 / Math.PI;
+                const eqtime = (q/15 - (ra < 0 ? ra + 360 : ra)/15) * 60;
+                const decl = Math.asin(Math.sin(e * Math.PI / 180) * Math.sin(L * Math.PI / 180)) * 180 / Math.PI;
+                
+                const dhuhrDecimal = 12 + timezone - (lng / 15) - (eqtime / 60) + (2 / 60);
+                
+                function hourAngle(angle) {
+                    const cosHA = (Math.sin(-angle * Math.PI / 180) - Math.sin(lat * Math.PI / 180) * Math.sin(decl * Math.PI / 180)) / (Math.cos(lat * Math.PI / 180) * Math.cos(decl * Math.PI / 180));
+                    if (cosHA > 1 || cosHA < -1) return 0;
+                    return Math.acos(cosHA) * 180 / Math.PI / 15;
                 }
-            } catch (e) {
-                updatePrayerUI();
+                
+                const fajrHA = hourAngle(20);
+                const ishaHA = hourAngle(18);
+                const maghribHA = hourAngle(0.833);
+                
+                const asrAngle = Math.atan(1 + Math.tan(Math.abs(lat - decl) * Math.PI / 180));
+                const asrHA = Math.acos((Math.sin(asrAngle) - Math.sin(lat * Math.PI / 180) * Math.sin(decl * Math.PI / 180)) / (Math.cos(lat * Math.PI / 180) * Math.cos(decl * Math.PI / 180))) * 180 / Math.PI / 15;
+                
+                const fajrDecimal = dhuhrDecimal - fajrHA + (2 / 60);
+                const asrDecimal = dhuhrDecimal + asrHA + (2 / 60);
+                const maghribDecimal = dhuhrDecimal + maghribHA + (2 / 60);
+                const ishaDecimal = dhuhrDecimal + ishaHA + (2 / 60);
+                
+                function toHHMM(dec) {
+                    const h = Math.floor(dec);
+                    const m = Math.floor((dec - h) * 60);
+                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                }
+                
+                return {
+                    Subuh: toHHMM(fajrDecimal),
+                    Dzuhur: toHHMM(dhuhrDecimal),
+                    Ashar: toHHMM(asrDecimal),
+                    Maghrib: toHHMM(maghribDecimal),
+                    Isya: toHHMM(ishaDecimal)
+                };
+            } catch (err) {
+                return prayerTimes;
+            }
+        }
+
+        async function fetchPrayerTimes() {
+            // Hitung jadwal offline presisi Wonogiri (Kemenag)
+            prayerTimes = calculateWonogiriPrayerTimes(new Date());
+            updatePrayerUI();
+
+            // Jika online, coba perbarui dari Aladhan API
+            if (navigator.onLine) {
+                try {
+                    const res = await fetch(`https://api.aladhan.com/v1/timingsByCity?city=Wonogiri&country=Indonesia&method=20`);
+                    const json = await res.json();
+                    if (json && json.data && json.data.timings) {
+                        const t = json.data.timings;
+                        prayerTimes = {
+                            Subuh: t.Fajr.substring(0, 5),
+                            Dzuhur: t.Dhuhr.substring(0, 5),
+                            Ashar: t.Asr.substring(0, 5),
+                            Maghrib: t.Maghrib.substring(0, 5),
+                            Isya: t.Isha.substring(0, 5)
+                        };
+                        updatePrayerUI();
+                    }
+                } catch (e) {}
             }
         }
 

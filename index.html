@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="./manifest.json">
     <title>RFID SMK GM 1 Wuryantoro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -27,33 +29,29 @@
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            padding: 4rem;
+            padding: 2rem;
         }
 
         .main-container {
             width: 100%;
             height: 100%;
             max-width: 1500px;
-            max-height: 90vh; 
+            max-height: 92vh; 
             display: grid;
             grid-template-columns: 1fr 420px; 
-            grid-template-rows: auto 1fr;
-            gap: 2.5rem;
+            gap: 2rem;
+            min-height: 0;
         }
 
-        .header-area {
-            grid-column: 1 / span 2;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            padding-bottom: 2rem;
-            border-bottom: 2px solid var(--border);
+        .main-container > * {
+            min-height: 0;
+            min-width: 0;
         }
 
         .premium-card {
             background: var(--card-bg);
             border: 2px solid var(--border);
-            border-radius: 3.5rem;
+            border-radius: 3rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -63,6 +61,7 @@
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);
             transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             height: 100%;
+            overflow: hidden;
         }
 
         .status-success {
@@ -84,12 +83,14 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            min-height: 0;
             overflow: hidden;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
         }
 
         .log-container {
-            flex-grow: 1;
+            flex: 1 1 0%;
+            min-height: 0;
             padding: 1rem;
             overflow-y: auto;
             display: flex;
@@ -129,6 +130,20 @@
             font-family: 'JetBrains Mono', monospace;
             color: var(--accent);
             line-height: 1;
+        }
+
+        /* ===================== JADWAL SHOLAT ===================== */
+        .prayer-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .prayer-card.active {
+            background-color: #2563eb !important;
+            border-color: #2563eb !important;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+            transform: translateY(-2px);
+        }
+        .prayer-card.active span {
+            color: #ffffff !important;
         }
 
         /* ===================== GREETING OVERLAY ===================== */
@@ -387,35 +402,86 @@
 
     <div class="main-container">
         
-        <!-- Header -->
-        <header class="header-area">
-            <div>
-                <h1 class="text-2xl font-800 tracking-tight text-slate-900 uppercase">
-                    SMK <span class="text-blue-600">GAJAH MUNGKUR 1</span>
-                </h1>
-                <p class="text-[10px] font-bold text-slate-400 tracking-[0.4em] uppercase mt-1 italic">Presensi Digital Terintegrasi</p>
-            </div>
-            <div class="flex items-center space-x-10">
-                <div id="clock" class="clock-display text-6xl font-800 tracking-tighter">00:00:00</div>
-                <div class="flex flex-col items-end">
-                    <div class="flex items-center space-x-2 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 mb-1">
-                        <span id="statusServerDot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span class="text-[9px] font-900 tracking-widest text-emerald-700 uppercase">Online</span>
-                    </div>
-                    <span id="dbStats" class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Syncing...</span>
-                </div>
-            </div>
-        </header>
-
         <!-- Kiri: Area Scanner Utama -->
         <main class="h-full">
             <div id="displayCard" class="premium-card">
-                <div class="space-y-8 p-12">
+                
+                <!-- Tampilan IDLE (Jam Besar, Identitas Sekolah & Jam Sholat) -->
+                <div id="idleState" class="flex flex-col items-center justify-between p-6 w-full h-full">
+                    
+                    <!-- Header Identitas Sekolah (Besar & Presisi) -->
+                    <div class="flex flex-col items-center justify-center text-center space-y-1 my-1">
+                        <div class="flex items-center justify-center space-x-3">
+                            <span class="text-2xl md:text-3xl xl:text-4xl">🏫</span>
+                            <h1 class="text-xl md:text-3xl xl:text-4xl font-900 tracking-tight text-slate-900 uppercase">
+                                SMK <span class="text-blue-600">GAJAH MUNGKUR 1</span> WURYANTORO
+                            </h1>
+                        </div>
+                        <p class="text-xs md:text-sm font-800 text-blue-600 tracking-[0.35em] uppercase italic bg-blue-50 px-6 py-1 rounded-full border border-blue-100/80 mt-1 shadow-sm">
+                            Presensi Digital Terintegrasi
+                        </p>
+                    </div>
+                    
+                    <!-- Main Giant Clock -->
+                    <div class="flex flex-col items-center justify-center my-auto w-full">
+                        <div id="bigClock" class="clock-display text-7xl md:text-[8rem] xl:text-[9.5rem] font-900 tracking-tight text-blue-600 drop-shadow-md leading-none">
+                            00:00:00
+                        </div>
+                        <div id="bigDate" class="text-base md:text-2xl xl:text-3xl font-900 text-slate-800 uppercase tracking-[0.25em] mt-3 bg-blue-50/90 px-10 py-2.5 rounded-full shadow-sm border-2 border-blue-200/80">
+                            -
+                        </div>
+                    </div>
+
+                    <!-- Strip Jadwal Sholat Wonogiri dengan Banner Countdown Raksasa -->
+                    <div id="prayerContainer" class="w-full max-w-3xl bg-slate-50/90 border border-slate-200/90 rounded-2xl p-4 shadow-sm my-1">
+                        
+                        <!-- Banner Highlight Countdown Sholat Berikutnya (Besar & Jelas) -->
+                        <div class="w-full bg-blue-600 text-white rounded-2xl p-3.5 mb-3 flex items-center justify-between shadow-md shadow-blue-500/25">
+                            <div class="flex items-center space-x-3.5">
+                                <span class="text-2xl md:text-3xl animate-pulse">🕌</span>
+                                <div class="flex flex-col text-left">
+                                    <span class="text-[10px] font-900 tracking-[0.2em] text-blue-200 uppercase">Jadwal Sholat Wonogiri</span>
+                                    <span id="nextPrayerTitle" class="text-sm md:text-lg font-900 uppercase tracking-wide text-white">MENUJU SHOLAT</span>
+                                </div>
+                            </div>
+                            <div id="nextPrayerTimer" class="font-mono text-2xl md:text-3xl xl:text-4xl font-900 tracking-tight bg-white text-blue-700 px-6 py-1.5 rounded-xl shadow-inner border border-blue-100">
+                                00:00:00
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-5 gap-3">
+                            <div id="p-Subuh" class="prayer-card flex flex-col items-center p-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+                                <span class="text-[11px] md:text-xs font-900 text-slate-400 uppercase tracking-wider">Subuh</span>
+                                <span id="t-Subuh" class="text-sm md:text-lg xl:text-xl font-900 text-slate-800 font-mono mt-1">04:30</span>
+                            </div>
+                            <div id="p-Dzuhur" class="prayer-card flex flex-col items-center p-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+                                <span class="text-[11px] md:text-xs font-900 text-slate-400 uppercase tracking-wider">Dzuhur</span>
+                                <span id="t-Dzuhur" class="text-sm md:text-lg xl:text-xl font-900 text-slate-800 font-mono mt-1">11:46</span>
+                            </div>
+                            <div id="p-Ashar" class="prayer-card flex flex-col items-center p-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+                                <span class="text-[11px] md:text-xs font-900 text-slate-400 uppercase tracking-wider">Ashar</span>
+                                <span id="t-Ashar" class="text-sm md:text-lg xl:text-xl font-900 text-slate-800 font-mono mt-1">15:07</span>
+                            </div>
+                            <div id="p-Maghrib" class="prayer-card flex flex-col items-center p-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+                                <span class="text-[11px] md:text-xs font-900 text-slate-400 uppercase tracking-wider">Maghrib</span>
+                                <span id="t-Maghrib" class="text-sm md:text-lg xl:text-xl font-900 text-slate-800 font-mono mt-1">17:40</span>
+                            </div>
+                            <div id="p-Isya" class="prayer-card flex flex-col items-center p-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+                                <span class="text-[11px] md:text-xs font-900 text-slate-400 uppercase tracking-wider">Isya</span>
+                                <span id="t-Isya" class="text-sm md:text-lg xl:text-xl font-900 text-slate-800 font-mono mt-1">18:52</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+
+                <!-- Tampilan SCAN (Ketika kartu di-tap) -->
+                <div id="scanState" class="hidden flex-col items-center justify-center space-y-8 p-12 w-full h-full">
                     <div id="labelTop" class="text-slate-400 text-xs font-bold tracking-[0.8em] uppercase">
                         Silahkan Tap Kartu RFID
                     </div>
                     
-                    <h2 id="nameMain" class="text-6xl font-800 text-slate-900 leading-tight tracking-tight transition-all duration-500 max-w-2xl">
+                    <h2 id="nameMain" class="text-5xl md:text-6xl font-800 text-slate-900 leading-tight tracking-tight transition-all duration-500 max-w-2xl text-center">
                         READY
                     </h2>
                     
@@ -423,6 +489,7 @@
                         ID: ————————
                     </div>
                 </div>
+
                 <input type="text" id="rfidInput" autocomplete="off" autofocus inputmode="none">
             </div>
         </main>
@@ -430,8 +497,14 @@
         <!-- Kanan: Panel Aktivitas Terakhir -->
         <aside class="side-log-panel">
             <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <h3 class="text-[10px] font-900 tracking-[0.2em] text-slate-500 uppercase">Log Aktivitas Terbaru</h3>
-                <div class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                <div>
+                    <h3 class="text-[10px] font-900 tracking-[0.2em] text-slate-500 uppercase">Log Aktivitas Terbaru</h3>
+                    <span id="dbStats" class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter block mt-0.5">Syncing...</span>
+                </div>
+                <div class="flex items-center space-x-2 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                    <span id="statusServerDot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-[9px] font-900 tracking-widest text-emerald-700 uppercase">Online</span>
+                </div>
             </div>
             
             <div id="logList" class="log-container">
@@ -476,6 +549,18 @@
 
         function forceFocus() { rfidInput.focus(); }
 
+        rfidInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(autoSubmitTimeout);
+                const val = rfidInput.value.trim();
+                if (val) {
+                    processScan(val);
+                    rfidInput.value = "";
+                }
+            }
+        });
+
         rfidInput.addEventListener('input', (e) => {
             clearTimeout(autoSubmitTimeout);
             const val = rfidInput.value.trim();
@@ -484,9 +569,12 @@
                 rfidInput.value = "";
             } else if (val.length > 0) {
                 autoSubmitTimeout = setTimeout(() => {
-                    processScan(rfidInput.value.trim());
-                    rfidInput.value = "";
-                }, 400); 
+                    const currentVal = rfidInput.value.trim();
+                    if (currentVal) {
+                        processScan(currentVal);
+                        rfidInput.value = "";
+                    }
+                }, 350); 
             }
         });
 
@@ -494,7 +582,7 @@
 
         function processScan(id) {
             if (!id) return;
-            const cleanId = id.toString().trim();
+            let cleanId = id.toString().trim().replace(/^'+/, '');
 
             const now = Date.now();
             if (lastScannedTime[cleanId] && (now - lastScannedTime[cleanId] < COOLDOWN_MS)) {
@@ -503,22 +591,41 @@
             }
             lastScannedTime[cleanId] = now;
 
-            const user = database[cleanId];
+            // Cari user di database (pencarian fleksibel dengan/tanpa 0 di depan)
+            let user = database[cleanId] || database[cleanId.replace(/^0+/, '')];
+            
+            if (!user) {
+                const unpadded = cleanId.replace(/^0+/, '');
+                for (const k in database) {
+                    const cleanK = k.toString().trim().replace(/^'+/, '').replace(/^0+/, '');
+                    if (cleanK === unpadded) {
+                        user = database[k];
+                        cleanId = k;
+                        break;
+                    }
+                }
+            }
+
             const isSuccess = !!user;
             const nama = isSuccess ? user.nama : "ID TIDAK TERDAFTAR";
             const peran = isSuccess ? user.peran : "TAMU";
 
             // Deteksi Status tap ke-1 = DATANG, tap ke-2 dst = PULANG
             let currentStatus = "DATANG";
-            
             const todayKey = new Date().toDateString();
             const localUserHistoryKey = `scan_${cleanId}_${todayKey}`;
-            const hasScannedToday = localStorage.getItem(localUserHistoryKey);
 
-            if (hasScannedToday) {
-                currentStatus = "PULANG";
+            if (isSuccess) {
+                const hasScannedToday = localStorage.getItem(localUserHistoryKey);
+                if (hasScannedToday) {
+                    currentStatus = "PULANG";
+                } else {
+                    localStorage.setItem(localUserHistoryKey, "true");
+                }
             } else {
-                localStorage.setItem(localUserHistoryKey, "true");
+                // Jika database belum siap / user belum terdaftar, HAPUS key lokal salah jika pernah tersimpan
+                localStorage.removeItem(localUserHistoryKey);
+                currentStatus = "DATANG";
             }
 
             updateUI(nama, cleanId, isSuccess, peran, currentStatus);
@@ -672,6 +779,8 @@
 
         function updateUI(nama, id, success, peran, status) {
             const card = document.getElementById('displayCard');
+            const idleState = document.getElementById('idleState');
+            const scanState = document.getElementById('scanState');
             const nameH = document.getElementById('nameMain');
             const label = document.getElementById('labelTop');
             const sub = document.getElementById('idSub');
@@ -679,6 +788,13 @@
             // Reset scanner card active classes from previous tap
             clearTimeout(cardResetTimeout);
             card.classList.remove('status-success', 'status-error');
+
+            // Tampilkan Scan State, Sembunyikan Idle State
+            if (idleState) idleState.classList.add('hidden');
+            if (scanState) {
+                scanState.classList.remove('hidden');
+                scanState.classList.add('flex');
+            }
 
             nameH.innerText = nama;
             sub.innerText = `ID: ${id} [${peran}]`;
@@ -702,6 +818,16 @@
                 sub.innerText = "ID: ————————";
                 label.innerText = "Silahkan Tap Kartu RFID";
                 label.className = "text-slate-400 text-xs font-bold tracking-[0.8em] uppercase";
+
+                // Kembalikan ke Tampilan Idle (Jam Besar + Identitas SMK)
+                if (scanState) {
+                    scanState.classList.add('hidden');
+                    scanState.classList.remove('flex');
+                }
+                if (idleState) {
+                    idleState.classList.remove('hidden');
+                    idleState.classList.add('flex');
+                }
             }, GREETING_DURATION + 500);
         }
 
@@ -778,15 +904,138 @@
             } catch (e) {}
         }
 
+        let prayerTimes = {
+            Subuh: "04:30",
+            Dzuhur: "11:46",
+            Ashar: "15:07",
+            Maghrib: "17:40",
+            Isya: "18:52"
+        };
+
+        async function fetchPrayerTimes() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const cacheKey = `prayer_wonogiri_${todayStr}`;
+            const cached = localStorage.getItem(cacheKey);
+
+            if (cached) {
+                try {
+                    prayerTimes = JSON.parse(cached);
+                    updatePrayerUI();
+                    return;
+                } catch(e) {}
+            }
+
+            try {
+                const res = await fetch(`https://api.aladhan.com/v1/timingsByCity?city=Wonogiri&country=Indonesia&method=20`);
+                const json = await res.json();
+                if (json && json.data && json.data.timings) {
+                    const t = json.data.timings;
+                    prayerTimes = {
+                        Subuh: t.Fajr.substring(0, 5),
+                        Dzuhur: t.Dhuhr.substring(0, 5),
+                        Ashar: t.Asr.substring(0, 5),
+                        Maghrib: t.Maghrib.substring(0, 5),
+                        Isya: t.Isha.substring(0, 5)
+                    };
+                    localStorage.setItem(cacheKey, JSON.stringify(prayerTimes));
+                    updatePrayerUI();
+                }
+            } catch (e) {
+                updatePrayerUI();
+            }
+        }
+
+        function updatePrayerUI() {
+            for (const key in prayerTimes) {
+                const el = document.getElementById(`t-${key}`);
+                if (el) el.innerText = prayerTimes[key];
+            }
+        }
+
+        function updatePrayerCountdown() {
+            const now = new Date();
+            const currentSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+            const prayerList = [
+                { name: 'Subuh', timeStr: prayerTimes.Subuh },
+                { name: 'Dzuhur', timeStr: prayerTimes.Dzuhur },
+                { name: 'Ashar', timeStr: prayerTimes.Ashar },
+                { name: 'Maghrib', timeStr: prayerTimes.Maghrib },
+                { name: 'Isya', timeStr: prayerTimes.Isya }
+            ];
+
+            let nextPrayer = null;
+            let minDiff = Infinity;
+
+            for (const p of prayerList) {
+                const parts = p.timeStr.split(':');
+                const sec = parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60;
+                let diff = sec - currentSec;
+                if (diff < 0) diff += 86400; // besok
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    nextPrayer = p;
+                }
+            }
+
+            prayerList.forEach(p => {
+                const card = document.getElementById(`p-${p.name}`);
+                if (card) {
+                    if (nextPrayer && p.name === nextPrayer.name) {
+                        card.classList.add('active');
+                    } else {
+                        card.classList.remove('active');
+                    }
+                }
+            });
+
+            if (nextPrayer) {
+                const h = Math.floor(minDiff / 3600);
+                const m = Math.floor((minDiff % 3600) / 60);
+                const s = minDiff % 60;
+                const pad = (n) => String(n).padStart(2, '0');
+                
+                const titleEl = document.getElementById('nextPrayerTitle');
+                const timerEl = document.getElementById('nextPrayerTimer');
+                
+                if (titleEl) titleEl.innerText = `MENUJU SHOLAT ${nextPrayer.name.toUpperCase()}`;
+                if (timerEl) timerEl.innerText = `${pad(h)}:${pad(m)}:${pad(s)}`;
+            }
+        }
+
+        function updateClockDisplay() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('id-ID', { hour12: false });
+            const optionsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const dateStr = now.toLocaleDateString('id-ID', optionsDate);
+
+            const bigClock = document.getElementById('bigClock');
+            const bigDate = document.getElementById('bigDate');
+            const headerClock = document.getElementById('clock');
+
+            if (bigClock) bigClock.innerText = timeStr;
+            if (bigDate) bigDate.innerText = dateStr;
+            if (headerClock) headerClock.innerText = timeStr;
+        }
+
         setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID', {hour12:false});
+            updateClockDisplay();
+            updatePrayerCountdown();
             if (navigator.onLine) syncQueue();
         }, 1000);
 
         window.onload = () => {
+            updateClockDisplay();
+            fetchPrayerTimes();
             fetchDatabase();
             forceFocus();
             setInterval(fetchDatabase, 300000);
+
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker Registered!', reg))
+                    .catch(err => console.warn('Service Worker Registration Failed:', err));
+            }
         };
     </script>
 </body>

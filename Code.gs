@@ -39,8 +39,7 @@ function doPost(e) {
     
     var todayStr = "";
     if (data.timestamp) {
-      // Ambil bagian tanggal saja dari timestamp, misal "22/06/2026"
-      var parts = data.timestamp.split(/\s+/);
+      var parts = data.timestamp.toString().split(/\s+/);
       todayStr = parts[0].replace(/,/g, '').trim(); 
     }
 
@@ -51,14 +50,18 @@ function doPost(e) {
     for (var i = 1; i < rows.length; i++) {
       var rowDate = "";
       if (rows[i][0]) {
-        var rowParts = rows[i][0].toString().split(/\s+/);
-        rowDate = rowParts[0].replace(/,/g, '').trim();
+        if (rows[i][0] instanceof Date) {
+          rowDate = Utilities.formatDate(rows[i][0], Session.getScriptTimeZone(), "dd/MM/yyyy");
+        } else {
+          var rowParts = rows[i][0].toString().split(/\s+/);
+          rowDate = rowParts[0].replace(/,/g, '').trim();
+        }
       }
       
       var rowRfid = rows[i][1] ? rows[i][1].toString().trim().replace(/^'+/, '') : "";
-      var cleanInputRfid = data.rfid_id.toString().trim().replace(/^'+/, '');
+      var cleanInputRfid = data.rfid_id ? data.rfid_id.toString().trim().replace(/^'+/, '') : "";
 
-      if (rowDate === todayStr && rowRfid === cleanInputRfid) {
+      if ((rowDate === todayStr || (rows[i][0] instanceof Date && Utilities.formatDate(rows[i][0], Session.getScriptTimeZone(), "d/M/yyyy") === todayStr)) && rowRfid === cleanInputRfid) {
         var rowStatus = rows[i][4] ? rows[i][4].toString().trim().toUpperCase() : "";
         if (rowStatus === "DATANG") {
           foundDatang = true;
@@ -75,7 +78,7 @@ function doPost(e) {
 
     if (status === "PULANG" && foundPulangRowIndex !== -1) {
       // Update baris PULANG yang sudah ada dengan timestamp terbaru (scan terakhir)
-      logSheet.getCell(foundPulangRowIndex, 1).setValue(data.timestamp);
+      logSheet.getRange(foundPulangRowIndex, 1).setValue(data.timestamp);
     } else {
       // Tulis baris baru
       logSheet.appendRow([

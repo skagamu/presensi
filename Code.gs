@@ -1,6 +1,6 @@
 // ============================================================
 //  Google Apps Script – Presensi RFID SMK GM 1 Wuryantoro
-//  Versi 3.1 – Standalone Script + Sinkronisasi Izin Kerja
+//  Versi 3.2 – Standalone Script + Accurate Timestamp
 // ============================================================
 
 var SPREADSHEET_ID = "1vrpYndWiuHcKbomBQO5in2EzMn94zinzu1EM5xifoFU";
@@ -17,7 +17,16 @@ function doGet(e) {
     var logSheet = ss.getSheetByName("Presensi");
     var data = logSheet.getDataRange().getValues();
     data.shift(); // Hapus header
-    return ContentService.createTextOutput(JSON.stringify(data))
+    
+    // Normalisasi timestamp Date object ke string format id-ID
+    var formattedData = data.map(function(row) {
+      if (row[0] instanceof Date) {
+        row[0] = Utilities.formatDate(row[0], "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss");
+      }
+      return row;
+    });
+
+    return ContentService.createTextOutput(JSON.stringify(formattedData))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -63,7 +72,7 @@ function doPost(e) {
       var rowDate = "";
       if (rows[i][0]) {
         if (rows[i][0] instanceof Date) {
-          rowDate = Utilities.formatDate(rows[i][0], Session.getScriptTimeZone(), "dd/MM/yyyy");
+          rowDate = Utilities.formatDate(rows[i][0], "Asia/Jakarta", "dd/MM/yyyy");
         } else {
           var rowParts = rows[i][0].toString().split(/\s+/);
           rowDate = rowParts[0].replace(/,/g, '').trim();
@@ -73,7 +82,7 @@ function doPost(e) {
       var rowRfid = rows[i][1] ? rows[i][1].toString().trim().replace(/^'+/, '') : "";
       var cleanInputRfid = data.rfid_id ? data.rfid_id.toString().trim().replace(/^'+/, '') : "";
 
-      if ((rowDate === todayStr || (rows[i][0] instanceof Date && Utilities.formatDate(rows[i][0], Session.getScriptTimeZone(), "d/M/yyyy") === todayStr)) && rowRfid === cleanInputRfid) {
+      if ((rowDate === todayStr || (rows[i][0] instanceof Date && Utilities.formatDate(rows[i][0], "Asia/Jakarta", "d/M/yyyy") === todayStr)) && rowRfid === cleanInputRfid) {
         var rowStatus = rows[i][4] ? rows[i][4].toString().trim().toUpperCase() : "";
         if (rowStatus === "DATANG") {
           foundDatang = true;
@@ -88,14 +97,16 @@ function doPost(e) {
       status = "PULANG";
     }
 
+    var timestampText = "'" + (data.timestamp || Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss"));
+
     if (status === "PULANG" && foundPulangRowIndex !== -1) {
-      logSheet.getRange(foundPulangRowIndex, 1).setValue(data.timestamp);
+      logSheet.getRange(foundPulangRowIndex, 1).setValue(timestampText);
     } else {
       logSheet.appendRow([
-        data.timestamp,
+        timestampText,
         data.rfid_id,
         data.name,
-        data.peran || "SISSA",
+        data.peran || "SISWA",
         status
       ]);
     }
@@ -129,27 +140,31 @@ function doPost(e) {
       statusIzin = "IZIN (PULANG AWAL)";
     }
 
+    // Ambil jam saat ini di timezone WIB
+    var nowTime = Utilities.formatDate(new Date(), "Asia/Jakarta", "HH:mm:ss");
     var dateFormatted = "";
+    
     if (data.hari_tgl) {
       try {
         var rawTgl = data.hari_tgl.toString().trim();
         if (/^\d{4}-\d{2}-\d{2}$/.test(rawTgl)) {
           var p = rawTgl.split('-');
-          dateFormatted = p[2] + "/" + p[1] + "/" + p[0] + " 00:00:00";
+          dateFormatted = p[2] + "/" + p[1] + "/" + p[0] + ", " + nowTime;
         } else {
           var parsedDate = new Date(rawTgl);
-          dateFormatted = Utilities.formatDate(parsedDate, Session.getScriptTimeZone(), "dd/MM/yyyy 00:00:00");
+          dateFormatted = Utilities.formatDate(parsedDate, "Asia/Jakarta", "dd/MM/yyyy, ") + nowTime;
         }
       } catch(e) {
-        dateFormatted = data.hari_tgl + " 00:00:00";
+        dateFormatted = Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss");
       }
     } else {
-      dateFormatted = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
+      dateFormatted = Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss");
     }
 
+    // Beri awalan ' agar Google Sheet menyimpannya murni sebagai teks presisi
     var logSheet = ss.getSheetByName("Presensi");
     logSheet.appendRow([
-      dateFormatted,
+      "'" + dateFormatted,
       rfid,
       data.nama,
       peran,

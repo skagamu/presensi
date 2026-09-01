@@ -122,6 +122,8 @@
         .badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 99px; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
         .badge-success { background: var(--success-bg); color: #065f46; }
         .badge-warning { background: var(--warning-bg); color: #92400e; }
+        .badge-info { background: #e0f2fe; color: #0369a1; }
+        .badge-purple { background: #f3e8ff; color: #7e22ce; }
 
         /* ── PAGINATION ── */
         .pagination { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.5rem; border-top: 1px solid var(--border); background: #f8fafc; flex-wrap: wrap; gap: 0.5rem; }
@@ -311,6 +313,7 @@
                     <option value="">Semua Status</option>
                     <option value="DATANG">Datang</option>
                     <option value="PULANG">Pulang</option>
+                    <option value="IZIN">Izin</option>
                 </select>
                 <input type="date" class="filter-input" id="filterDari" onchange="applyPresensiFilters()">
                 <span style="font-size:0.72rem;color:var(--text-muted);font-weight:600">s/d</span>
@@ -456,7 +459,7 @@
 // ═══════════════════════════════════════════════════════
 // CONFIG — Ganti URL jika sudah deploy script baru
 // ═══════════════════════════════════════════════════════
-const API_URL = "https://script.google.com/macros/s/AKfycbycrLlUiETE6rBBnZNIoa7GoA-W-9Pzko3UUkmccvgLdSe8sXOGxpbY91EanUF-CtLX/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbw3JgGNB7JtL8YkeQ2A-QM2UVeohbe9j6GC_d58LpZbGn46W6NCWv_tpN92KInaRKv3/exec";
 const ROWS_PER_PAGE = 25;
 
 // Urutan kolom sheet Presensi: [timestamp, rfid_id, nama, peran, status]
@@ -656,7 +659,7 @@ function updateDashRecent() {
     }
     body.innerHTML = recent.map(p => {
         const isTamu = !p.nama || p.nama.toLowerCase() === 'tamu/asing';
-        const statusBadge = p.status === 'DATANG' ? 'badge-success' : 'badge-warning';
+        let statusBadge = p.status === "DATANG" ? "badge-success" : (p.status.startsWith("IZIN") ? "badge-info" : "badge-warning");
         return `<tr>
             <td class="td-mono">${p.timestamp}</td>
             <td class="td-mono">${p.rfid}</td>
@@ -716,7 +719,7 @@ function renderPresensiTable() {
     const rows  = filteredPresensi.slice(start, start + ROWS_PER_PAGE);
     body.innerHTML = rows.map(p => {
         const isTamu = !p.nama || p.nama.toLowerCase() === 'tamu/asing';
-        const statusBadge = p.status === 'DATANG' ? 'badge-success' : 'badge-warning';
+        let statusBadge = p.status === "DATANG" ? "badge-success" : (p.status.startsWith("IZIN") ? "badge-info" : "badge-warning");
         return `<tr>
             <td class="td-mono">${p.timestamp}</td>
             <td class="td-mono">${p.rfid}</td>
@@ -830,7 +833,7 @@ function renderPagination(id, total, cur, cb) {
 // REKAP KEHADIRAN
 // ═══════════════════════════════════════════════════════
 function buildAttendanceMap() {
-    attendanceMap = new Map(); // Key: "YYYY-MM-DD" -> Map(rfid -> { datang: "HH:MM", pulang: "HH:MM" })
+    attendanceMap = new Map(); // Key: "YYYY-MM-DD" -> Map(rfid -> { datang: "—", pulang: "—", izin: null })
     allPresensi.forEach(p => {
         if (!p.rfid || !p.nama || p.nama.toLowerCase() === 'tamu/asing') return;
         const d = parseIDDate(p.timestamp);
@@ -843,12 +846,11 @@ function buildAttendanceMap() {
         
         const userMap = attendanceMap.get(k);
         if (!userMap.has(p.rfid)) {
-            userMap.set(p.rfid, { datang: '—', pulang: '—' });
+            userMap.set(p.rfid, { datang: '—', pulang: '—', izin: null });
         }
         
         const times = userMap.get(p.rfid);
         
-        // Ambil jam:menit dari timestamp, misal "08:30"
         let timeStr = "";
         try {
             const timeParts = p.timestamp.split(/\s+/);
@@ -861,6 +863,10 @@ function buildAttendanceMap() {
             times.datang = timeStr || 'Hadir';
         } else if (p.status === 'PULANG') {
             times.pulang = timeStr || 'Hadir';
+        } else if (p.status.startsWith('IZIN')) {
+            if (p.status.includes('TERLAMBAT')) times.izin = 'TERLAMBAT';
+            else if (p.status.includes('PULANG AWAL')) times.izin = 'PULANG_AWAL';
+            else times.izin = 'TIDAK_MASUK';
         }
     });
 }
@@ -965,10 +971,16 @@ function renderRekap() {
                 if (hadir) hadirCount++;
                 
                 if (hadir) {
-                    cells += `<td class="${isToday ? 'td-today' : ''}" style="line-height: 1.2; padding: 0.35rem 0.2rem;" title="Datang: ${times.datang}, Pulang: ${times.pulang}">
-                        <div style="font-weight: 700; color: var(--success); font-size: 0.68rem;">D: ${times.datang}</div>
-                        <div style="font-weight: 600; color: #475569; font-size: 0.68rem; border-top: 1px dashed var(--border); margin-top: 2px;">P: ${times.pulang}</div>
-                    </td>`;
+                    if (times.izin === 'TIDAK_MASUK') {
+                        cells += `<td class="${isToday ? 'td-today' : ''}" style="background:#eff6ff;color:#2563eb;font-weight:800;font-size:0.65rem;text-align:center;padding:0.4rem 0.2rem;" title="Izin Tidak Masuk Kerja">IZIN</td>`;
+                    } else {
+                        let infoD = times.izin === 'TERLAMBAT' ? ' <span style="color:#d97706;font-size:0.55rem;">(Izin)</span>' : '';
+                        let infoP = times.izin === 'PULANG_AWAL' ? ' <span style="color:#d97706;font-size:0.55rem;">(Izin)</span>' : '';
+                        cells += `<td class="${isToday ? 'td-today' : ''}" style="line-height: 1.2; padding: 0.35rem 0.2rem;" title="Datang: ${times.datang}, Pulang: ${times.pulang}${times.izin ? " (Izin " + times.izin + ")" : ""}">
+                            <div style="font-weight: 700; color: var(--success); font-size: 0.68rem;">D: ${times.datang}${infoD}</div>
+                            <div style="font-weight: 600; color: #475569; font-size: 0.68rem; border-top: 1px dashed var(--border); margin-top: 2px;">P: ${times.pulang}${infoP}</div>
+                        </td>`;
+                    }
                 } else {
                     cells += `<td class="${isToday ? 'td-today' : ''} cell-absen" title="Tidak Hadir">—</td>`;
                 }
@@ -1059,10 +1071,24 @@ function exportRekapXLSX() {
                 const times = dayMap ? dayMap.get(s.rfid) : null;
                 
                 if (times) {
-                    statusHari = 'Hadir';
-                    jamDatang = times.datang;
-                    jamPulang = times.pulang;
-                    durasi = getDuration(jamDatang, jamPulang);
+                    if (times.izin === 'TIDAK_MASUK') {
+                        statusHari = 'Izin (Tidak Masuk)';
+                    } else if (times.izin === 'TERLAMBAT') {
+                        statusHari = 'Hadir (Izin Terlambat)';
+                        jamDatang = times.datang;
+                        jamPulang = times.pulang;
+                        durasi = getDuration(jamDatang, jamPulang);
+                    } else if (times.izin === 'PULANG_AWAL') {
+                        statusHari = 'Hadir (Izin Pulang Awal)';
+                        jamDatang = times.datang;
+                        jamPulang = times.pulang;
+                        durasi = getDuration(jamDatang, jamPulang);
+                    } else {
+                        statusHari = 'Hadir';
+                        jamDatang = times.datang;
+                        jamPulang = times.pulang;
+                        durasi = getDuration(jamDatang, jamPulang);
+                    }
                 } else {
                     statusHari = 'Tidak Hadir';
                 }

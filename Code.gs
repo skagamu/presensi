@@ -1,15 +1,19 @@
 // ============================================================
 //  Google Apps Script – Presensi RFID SMK GM 1 Wuryantoro
-//  Versi 3.0 – Support Guru & Siswa + Status Datang/Pulang
+//  Versi 3.1 – Standalone Script + Sinkronisasi Izin Kerja
 // ============================================================
 
+var SPREADSHEET_ID = "1vrpYndWiuHcKbomBQO5in2EzMn94zinzu1EM5xifoFU";
+
+function getSpreadsheet() {
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
 function doGet(e) {
-  var action = e.parameter.action || "getDatabase";
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "getDatabase";
+  var ss = getSpreadsheet();
 
   if (action === "getPresensi") {
-    // Ambil semua log dari sheet Presensi
-    // Kolom Presensi: [Timestamp, RFID ID, Nama, Peran, Status]
     var logSheet = ss.getSheetByName("Presensi");
     var data = logSheet.getDataRange().getValues();
     data.shift(); // Hapus header
@@ -17,8 +21,7 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Default: getDatabase – ambil data dari sheet Database
-  // Kolom Database: [RFID ID, Nama, Peran]
+  // Default: getDatabase
   var dbSheet = ss.getSheetByName("Database");
   var data = dbSheet.getDataRange().getValues();
   data.shift(); // Hapus header
@@ -27,13 +30,23 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var data = JSON.parse(e.postData.contents);
-  var action = data.action || "logPresensi"; // default: catat presensi
+  var ss = getSpreadsheet();
+  var data = {};
+  
+  if (e && e.postData && e.postData.contents) {
+    try {
+      data = JSON.parse(e.postData.contents);
+    } catch(err) {
+      data = e.parameter || {};
+    }
+  } else if (e && e.parameter) {
+    data = e.parameter;
+  }
+  
+  var action = data.action || "logPresensi";
 
-  // ── 1. CATAT PRESENSI (dari scanner index.html)
-  // Format data masuk: { rfid_id, name, peran, timestamp }
-  if (action === "logPresensi" || !data.action) {
+  // ── 1. CATAT PRESENSI SCANNER RFID (index.html)
+  if (action === "logPresensi") {
     var logSheet = ss.getSheetByName("Presensi");
     var rows = logSheet.getDataRange().getValues();
     
@@ -46,7 +59,6 @@ function doPost(e) {
     var foundDatang = false;
     var foundPulangRowIndex = -1;
 
-    // Cari entri presensi user hari ini untuk menentukan status (DATANG / PULANG)
     for (var i = 1; i < rows.length; i++) {
       var rowDate = "";
       if (rows[i][0]) {
@@ -66,7 +78,7 @@ function doPost(e) {
         if (rowStatus === "DATANG") {
           foundDatang = true;
         } else if (rowStatus === "PULANG") {
-          foundPulangRowIndex = i + 1; // 1-based index untuk sheet
+          foundPulangRowIndex = i + 1;
         }
       }
     }
@@ -77,15 +89,13 @@ function doPost(e) {
     }
 
     if (status === "PULANG" && foundPulangRowIndex !== -1) {
-      // Update baris PULANG yang sudah ada dengan timestamp terbaru (scan terakhir)
       logSheet.getRange(foundPulangRowIndex, 1).setValue(data.timestamp);
     } else {
-      // Tulis baris baru
       logSheet.appendRow([
         data.timestamp,
         data.rfid_id,
         data.name,
-        data.peran || "SISWA",
+        data.peran || "SISSA",
         status
       ]);
     }
@@ -94,10 +104,65 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // ── 2. TAMBAH GURU / SISWA BARU (dari admin panel)
+  // ── 2. CATAT PERMOHONAN IZIN KERJA (dari repo izin-kerja)
+  if (action === "logIzin") {
+    var dbSheet = ss.getSheetByName("Database");
+    var dbRows = dbSheet.getDataRange().getValues();
+    var rfid = "-";
+    var peran = "GURU";
+
+    var targetNama = (data.nama || "").toString().trim().toLowerCase();
+    for (var j = 1; j < dbRows.length; j++) {
+      var rowName = (dbRows[j][1] || "").toString().trim().toLowerCase();
+      if (rowName === targetNama) {
+        rfid = dbRows[j][0] ? dbRows[j][0].toString().trim().replace(/^'+/, '') : "-";
+        peran = dbRows[j][2] || "GURU";
+        break;
+      }
+    }
+
+    var statusIzin = "IZIN (TIDAK MASUK)";
+    var jenis = (data.jenis_izin || "").toString().toLowerCase();
+    if (jenis.indexOf("terlambat") !== -1) {
+      statusIzin = "IZIN (TERLAMBAT)";
+    } else if (jenis.indexOf("pulang") !== -1 || jenis.indexOf("awal") !== -1) {
+      statusIzin = "IZIN (PULANG AWAL)";
+    }
+
+    var dateFormatted = "";
+    if (data.hari_tgl) {
+      try {
+        var rawTgl = data.hari_tgl.toString().trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(rawTgl)) {
+          var p = rawTgl.split('-');
+          dateFormatted = p[2] + "/" + p[1] + "/" + p[0] + " 00:00:00";
+        } else {
+          var parsedDate = new Date(rawTgl);
+          dateFormatted = Utilities.formatDate(parsedDate, Session.getScriptTimeZone(), "dd/MM/yyyy 00:00:00");
+        }
+      } catch(e) {
+        dateFormatted = data.hari_tgl + " 00:00:00";
+      }
+    } else {
+      dateFormatted = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm:ss");
+    }
+
+    var logSheet = ss.getSheetByName("Presensi");
+    logSheet.appendRow([
+      dateFormatted,
+      rfid,
+      data.nama,
+      peran,
+      statusIzin
+    ]);
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", presensiStatus: statusIzin }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ── 3. TAMBAH GURU / SISWA BARU
   if (action === "addStudent") {
     var dbSheet = ss.getSheetByName("Database");
-    // Cek duplikasi RFID
     var existing = dbSheet.getDataRange().getValues();
     for (var i = 1; i < existing.length; i++) {
       if (existing[i][0] && existing[i][0].toString().trim() === data.rfid_id.toString().trim()) {
@@ -110,13 +175,13 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // ── 3. HAPUS GURU / SISWA (dari admin panel)
+  // ── 4. HAPUS GURU / SISWA
   if (action === "deleteStudent") {
     var dbSheet = ss.getSheetByName("Database");
     var rows = dbSheet.getDataRange().getValues();
     for (var i = 1; i < rows.length; i++) {
       if (rows[i][0] && rows[i][0].toString().trim() === data.rfid_id.toString().trim()) {
-        dbSheet.deleteRow(i + 1); // +1 karena index array mulai dari 0
+        dbSheet.deleteRow(i + 1);
         return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
           .setMimeType(ContentService.MimeType.JSON);
       }

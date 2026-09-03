@@ -1,10 +1,9 @@
 // ============================================================
 //  Google Apps Script – Presensi RFID SMK GM 1 Wuryantoro
-//  Versi 3.4 – Standalone Script + Upload Bukti ke Google Drive
+//  Versi 3.8 – Clean Logging Sheet Data Izin
 // ============================================================
 
 var SPREADSHEET_ID = "1vrpYndWiuHcKbomBQO5in2EzMn94zinzu1EM5xifoFU";
-var DRIVE_FOLDER_ID = "1Pew4I4XVVB9kY-B4H9b6DcAR00qDmB2r";
 
 function getSpreadsheet() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -18,7 +17,7 @@ function doGet(e) {
   if (action === "getPresensi") {
     var logSheet = ss.getSheetByName("Presensi");
     var data = logSheet ? logSheet.getDataRange().getValues() : [];
-    if (data.length > 0) data.shift(); // Hapus header
+    if (data.length > 0) data.shift();
     
     var formattedData = data.map(function(row) {
       if (row[0] instanceof Date) {
@@ -39,7 +38,7 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
     var dataIzin = izinSheet.getDataRange().getValues();
-    if (dataIzin.length > 0) dataIzin.shift(); // Hapus header
+    if (dataIzin.length > 0) dataIzin.shift();
     
     var formattedIzin = dataIzin.map(function(row) {
       if (row[0] instanceof Date) {
@@ -55,7 +54,7 @@ function doGet(e) {
   // 3. Default: getDatabase master guru/siswa
   var dbSheet = ss.getSheetByName("Database");
   var dataDb = dbSheet ? dbSheet.getDataRange().getValues() : [];
-  if (dataDb.length > 0) dataDb.shift(); // Hapus header
+  if (dataDb.length > 0) dataDb.shift();
   return ContentService.createTextOutput(JSON.stringify(dataDb))
       .setMimeType(ContentService.MimeType.JSON);
 }
@@ -76,7 +75,7 @@ function doPost(e) {
   
   var action = data.action || "logPresensi";
 
-  // ── 1. CATAT PRESENSI SCANNER RFID (ke sheet Presensi)
+  // ── 1. CATAT PRESENSI SCANNER RFID
   if (action === "logPresensi") {
     var logSheet = ss.getSheetByName("Presensi");
     var rows = logSheet.getDataRange().getValues();
@@ -137,18 +136,16 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // ── 2. CATAT PERMOHONAN IZIN KERJA (ke sheet Data Izin + Upload Drive)
+  // ── 2. CATAT PERMOHONAN IZIN KERJA (Hanya rekap data teks ke sheet Data Izin)
   if (action === "logIzin") {
     var izinSheet = ss.getSheetByName("Data Izin");
     if (!izinSheet) {
       izinSheet = ss.insertSheet("Data Izin");
-      izinSheet.appendRow(["Timestamp Pengajuan", "Nama Lengkap", "Kedudukan / Peran", "Jenis Izin", "Hari / Tanggal Izin", "Alasan / Keterangan", "Link Bukti Dokumen"]);
+      izinSheet.appendRow(["Timestamp Pengajuan", "Nama Lengkap", "Kedudukan / Peran", "Jenis Izin", "Hari / Tanggal Izin", "Alasan / Keterangan", "Status Bukti"]);
     }
 
-    // Ambil timestamp pengajuan saat ini
     var timestampKirim = "'" + Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss");
     
-    // Format Hari/Tanggal yang diminta izin
     var hariTglIzin = data.hari_tgl || "-";
     try {
       if (/^\d{4}-\d{2}-\d{2}$/.test(hariTglIzin)) {
@@ -157,41 +154,8 @@ function doPost(e) {
       }
     } catch(e) {}
 
-    // Upload file ke Google Drive jika ada
-    var fileUrl = "-";
-    if (data.fileData) {
-      try {
-        var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
-        var base64Content = data.fileData;
-        var contentType = data.fileType || "image/jpeg";
-        
-        if (base64Content.indexOf("base64,") !== -1) {
-          base64Content = base64Content.split("base64,")[1];
-        }
-        
-        // Format nama file: DDMMYY-NamaLengkap (misal: 010926-Dra.Endang Susti Hariyani, M.M.jpg)
-        var datePrefix = Utilities.formatDate(new Date(), "Asia/Jakarta", "ddMMyy");
-        var ext = ".jpg";
-        if (data.fileName && data.fileName.lastIndexOf(".") !== -1) {
-          ext = data.fileName.substring(data.fileName.lastIndexOf("."));
-        }
-        var customFileName = datePrefix + "-" + (data.nama || "Guru") + ext;
+    var statusBukti = (data.fileName) ? "Tersimpan di Google Drive (" + data.fileName + ")" : "Tanpa Lampiran";
 
-        var decodedBlob = Utilities.newBlob(
-          Utilities.base64Decode(base64Content),
-          contentType,
-          customFileName
-        );
-        
-        var createdFile = folder.createFile(decodedBlob);
-        createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        fileUrl = createdFile.getUrl();
-      } catch(err) {
-        fileUrl = "Error upload: " + err.message;
-      }
-    }
-
-    // Simpan ke sheet "Data Izin"
     izinSheet.appendRow([
       timestampKirim,
       data.nama || "-",
@@ -199,10 +163,10 @@ function doPost(e) {
       data.jenis_izin || "-",
       hariTglIzin,
       data.alasan || "-",
-      fileUrl
+      statusBukti
     ]);
 
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Tercatat di Data Izin", fileUrl: fileUrl }))
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Tercatat di Data Izin" }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 

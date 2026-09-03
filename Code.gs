@@ -169,10 +169,18 @@ function doPost(e) {
           base64Content = base64Content.split("base64,")[1];
         }
         
+        // Format nama file: DDMMYY-NamaLengkap (misal: 010926-Dra.Endang Susti Hariyani, M.M.jpg)
+        var datePrefix = Utilities.formatDate(new Date(), "Asia/Jakarta", "ddMMyy");
+        var ext = ".jpg";
+        if (data.fileName && data.fileName.lastIndexOf(".") !== -1) {
+          ext = data.fileName.substring(data.fileName.lastIndexOf("."));
+        }
+        var customFileName = datePrefix + "-" + (data.nama || "Guru") + ext;
+
         var decodedBlob = Utilities.newBlob(
           Utilities.base64Decode(base64Content),
           contentType,
-          (data.nama || "Izin") + "_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss") + (data.fileName ? "_" + data.fileName : ".jpg")
+          customFileName
         );
         
         var createdFile = folder.createFile(decodedBlob);

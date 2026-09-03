@@ -588,7 +588,13 @@ async function loadPresensi() {
                 peran     : (r[COL_PERAN]     || 'SISWA').toString().trim().toUpperCase(),
                 status    : (r[COL_STATUS]    || 'DATANG').toString().trim().toUpperCase()
             };
-        }).filter(p => p.timestamp).reverse(); // terbaru di atas
+        }).filter(p => p.timestamp).sort((a, b) => {
+            const da = parseIDDate(a.timestamp);
+            const db = parseIDDate(b.timestamp);
+            const ta = da ? da.getTime() : 0;
+            const tb = db ? db.getTime() : 0;
+            return tb - ta; // Urutkan kronologis: yang paling baru di paling atas
+        });
 
         filteredPresensi = [...allPresensi];
         presensiPage = 1;

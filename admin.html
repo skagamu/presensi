@@ -510,13 +510,22 @@ function showPage(name) {
 function parseIDDate(str) {
     if (!str) return null;
     try {
+        if (typeof str === "string" && str.includes("T") && str.endsWith("Z")) {
+            const dt = new Date(str);
+            if (!isNaN(dt.getTime())) {
+                // Konversi UTC ke zona waktu lokal (Asia/Jakarta +7)
+                return new Date(dt.getTime() + (7 * 3600 * 1000));
+            }
+        }
         const s = str.replace(',', '').trim();
         const parts = s.split(/\s+/);
         const dateParts = parts[0].split('/');
-        if (dateParts.length !== 3) return null;
-        const d = parseInt(dateParts[0]), m = parseInt(dateParts[1]) - 1, y = parseInt(dateParts[2]);
-        if (isNaN(d) || isNaN(m) || isNaN(y)) return null;
-        return new Date(y, m, d);
+        if (dateParts.length === 3) {
+            const d = parseInt(dateParts[0]), m = parseInt(dateParts[1]) - 1, y = parseInt(dateParts[2]);
+            if (!isNaN(d) && !isNaN(m) && !isNaN(y)) return new Date(y, m, d);
+        }
+        const fallback = new Date(str);
+        return isNaN(fallback.getTime()) ? null : fallback;
     } catch(e) { return null; }
 }
 
@@ -564,8 +573,16 @@ async function loadPresensi() {
             }
         }
 
-        allPresensi = raw.map(r => ({
-            timestamp : (r[COL_TIMESTAMP] || '').toString().trim(),
+        allPresensi = raw.map(r => {
+            let rawTs = (r[COL_TIMESTAMP] || '').toString().trim();
+            if (rawTs.includes("T") && rawTs.endsWith("Z")) {
+                const dt = new Date(new Date(rawTs).getTime() + (7 * 3600 * 1000));
+                if (!isNaN(dt.getTime())) {
+                    rawTs = `${dt.getUTCDate()}/${dt.getUTCMonth()+1}/${dt.getUTCFullYear()}, ${String(dt.getUTCHours()).padStart(2,"0")}:${String(dt.getUTCMinutes()).padStart(2,"0")}:${String(dt.getUTCSeconds()).padStart(2,"0")}`;
+                }
+            }
+            return {
+                timestamp : rawTs,
             rfid      : (r[COL_RFID]      || '').toString().trim().replace(/^'+/, ''),
             nama      : (r[COL_NAMA]      || '').toString().trim(),
             peran     : (r[COL_PERAN]     || 'SISWA').toString().trim().toUpperCase(),

@@ -522,7 +522,18 @@ function parseIDDate(str) {
         const dateParts = parts[0].split('/');
         if (dateParts.length === 3) {
             const d = parseInt(dateParts[0]), m = parseInt(dateParts[1]) - 1, y = parseInt(dateParts[2]);
-            if (!isNaN(d) && !isNaN(m) && !isNaN(y)) return new Date(y, m, d);
+            if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+                let hours = 0, mins = 0, secs = 0;
+                if (parts.length > 1) {
+                    const timeParts = parts[1].replace(/\./g, ':').split(':');
+                    if (timeParts.length >= 2) {
+                        hours = parseInt(timeParts[0]) || 0;
+                        mins = parseInt(timeParts[1]) || 0;
+                        secs = parseInt(timeParts[2]) || 0;
+                    }
+                }
+                return new Date(y, m, d, hours, mins, secs);
+            }
         }
         const fallback = new Date(str);
         return isNaN(fallback.getTime()) ? null : fallback;

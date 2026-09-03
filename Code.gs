@@ -1,6 +1,6 @@
 // ============================================================
 //  Google Apps Script – Presensi RFID SMK GM 1 Wuryantoro
-//  Versi 3.8 – Clean Logging Sheet Data Izin
+//  Versi 4.0 – Unified Presensi & Data Izin on doGet
 // ============================================================
 
 var SPREADSHEET_ID = "1vrpYndWiuHcKbomBQO5in2EzMn94zinzu1EM5xifoFU";
@@ -13,24 +13,95 @@ function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "getDatabase";
   var ss = getSpreadsheet();
 
-  // 1. Ambil log Presensi RFID
+  // 1. Ambil log Presensi RFID + Data Izin secara otomatis untuk dashboard
   if (action === "getPresensi") {
+    // A. Ambil data scan RFID
     var logSheet = ss.getSheetByName("Presensi");
-    var data = logSheet ? logSheet.getDataRange().getValues() : [];
-    if (data.length > 0) data.shift();
+    var presensiData = logSheet ? logSheet.getDataRange().getValues() : [];
+    if (presensiData.length > 0) presensiData.shift(); // Hapus header
     
-    var formattedData = data.map(function(row) {
+    var formattedData = presensiData.map(function(row) {
       if (row[0] instanceof Date) {
         row[0] = Utilities.formatDate(row[0], "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss");
       }
       return row;
     });
 
+    // B. Ambil data dari sheet Data Izin
+    var izinSheet = ss.getSheetByName("Data Izin");
+    if (izinSheet) {
+      var dataIzin = izinSheet.getDataRange().getValues();
+      if (dataIzin.length > 1) {
+        dataIzin.shift(); // Hapus header
+
+        // Buat map nama -> rfid & peran dari sheet Database
+        var dbSheet = ss.getSheetByName("Database");
+        var dbRows = dbSheet ? dbSheet.getDataRange().getValues() : [];
+        var rfidMap = {};
+        for (var i = 1; i < dbRows.length; i++) {
+          var nameKey = (dbRows[i][1] || "").toString().trim().toLowerCase();
+          if (nameKey) {
+            rfidMap[nameKey] = {
+              rfid: (dbRows[i][0] || "-").toString().trim().replace(/^'+/, ''),
+              peran: dbRows[i][2] || "GURU"
+            };
+          }
+        }
+
+        // Mapping baris Data Izin ke format log presensi: [Timestamp, RFID, Nama, Peran, Status]
+        dataIzin.forEach(function(r) {
+          var ts = r[0]; // Timestamp pengajuan
+          if (ts instanceof Date) {
+            ts = Utilities.formatDate(ts, "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss");
+          } else {
+            ts = (ts || "").toString().trim().replace(/^'+/, '');
+          }
+
+          var nama = (r[1] || "").toString().trim();
+          var targetKey = nama.toLowerCase();
+          var rfid = (rfidMap[targetKey] && rfidMap[targetKey].rfid) ? rfidMap[targetKey].rfid : "-";
+          var peran = (rfidMap[targetKey] && rfidMap[targetKey].peran) ? rfidMap[targetKey].peran : (r[2] || "GURU");
+
+          var jenis = (r[3] || "").toString().toLowerCase();
+          var statusIzin = "IZIN (TIDAK MASUK)";
+          if (jenis.indexOf("terlambat") !== -1) {
+            statusIzin = "IZIN (TERLAMBAT)";
+          } else if (jenis.indexOf("pulang") !== -1 || jenis.indexOf("awal") !== -1) {
+            statusIzin = "IZIN (PULANG AWAL)";
+          }
+
+          // Target tanggal izin (r[4]) jika ada
+          var targetDate = r[4];
+          if (targetDate) {
+            var dateStr = "";
+            if (targetDate instanceof Date) {
+              dateStr = Utilities.formatDate(targetDate, "Asia/Jakarta", "dd/MM/yyyy");
+            } else {
+              dateStr = targetDate.toString().trim().replace(/^'+/, '');
+            }
+            if (dateStr && dateStr !== "-") {
+              var timePart = "00:00:00";
+              if (ts.includes(",")) timePart = ts.split(",")[1].trim();
+              ts = dateStr + (dateStr.includes(",") ? "" : ", " + timePart);
+            }
+          }
+
+          formattedData.push([
+            ts,
+            rfid,
+            nama,
+            peran,
+            statusIzin
+          ]);
+        });
+      }
+    }
+
     return ContentService.createTextOutput(JSON.stringify(formattedData))
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // 2. Ambil log Data Izin
+  // 2. Ambil log Data Izin murni
   if (action === "getDataIzin") {
     var izinSheet = ss.getSheetByName("Data Izin");
     if (!izinSheet) {
@@ -136,12 +207,12 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // ── 2. CATAT PERMOHONAN IZIN KERJA (Hanya rekap data teks ke sheet Data Izin)
+  // ── 2. CATAT PERMOHONAN IZIN KERJA (Hanya ke sheet Data Izin + Formula Gambar)
   if (action === "logIzin") {
     var izinSheet = ss.getSheetByName("Data Izin");
     if (!izinSheet) {
       izinSheet = ss.insertSheet("Data Izin");
-      izinSheet.appendRow(["Timestamp Pengajuan", "Nama Lengkap", "Kedudukan / Peran", "Jenis Izin", "Hari / Tanggal Izin", "Alasan / Keterangan", "Status Bukti"]);
+      izinSheet.appendRow(["Timestamp Pengajuan", "Nama Lengkap", "Kedudukan / Peran", "Jenis Izin", "Hari / Tanggal Izin", "Alasan / Keterangan", "Bukti Foto / Dokumen"]);
     }
 
     var timestampKirim = "'" + Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss");
@@ -154,7 +225,22 @@ function doPost(e) {
       }
     } catch(e) {}
 
-    var statusBukti = (data.fileName) ? "Tersimpan di Google Drive (" + data.fileName + ")" : "Tanpa Lampiran";
+    var imageFormula = "-";
+    var fileUrl = data.fileUrl || "";
+    if (fileUrl) {
+      var fileId = "";
+      if (fileUrl.indexOf("/d/") !== -1) {
+        fileId = fileUrl.split("/d/")[1].split("/")[0];
+      } else if (fileUrl.indexOf("id=") !== -1) {
+        fileId = fileUrl.split("id=")[1].split("&")[0];
+      }
+      
+      if (fileId) {
+        imageFormula = '=IMAGE("https://drive.google.com/thumbnail?sz=w600&id=' + fileId + '")';
+      } else {
+        imageFormula = fileUrl;
+      }
+    }
 
     izinSheet.appendRow([
       timestampKirim,
@@ -163,8 +249,11 @@ function doPost(e) {
       data.jenis_izin || "-",
       hariTglIzin,
       data.alasan || "-",
-      statusBukti
+      imageFormula
     ]);
+
+    var lastRow = izinSheet.getLastRow();
+    izinSheet.setRowHeight(lastRow, 80);
 
     return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Tercatat di Data Izin" }))
       .setMimeType(ContentService.MimeType.JSON);

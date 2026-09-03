@@ -583,11 +583,12 @@ async function loadPresensi() {
             }
             return {
                 timestamp : rawTs,
-            rfid      : (r[COL_RFID]      || '').toString().trim().replace(/^'+/, ''),
-            nama      : (r[COL_NAMA]      || '').toString().trim(),
-            peran     : (r[COL_PERAN]     || 'SISWA').toString().trim().toUpperCase(),
-            status    : (r[COL_STATUS]    || 'DATANG').toString().trim().toUpperCase()
-        })).filter(p => p.timestamp).reverse(); // terbaru di atas
+                rfid      : (r[COL_RFID]      || '').toString().trim().replace(/^'+/, ''),
+                nama      : (r[COL_NAMA]      || '').toString().trim(),
+                peran     : (r[COL_PERAN]     || 'SISWA').toString().trim().toUpperCase(),
+                status    : (r[COL_STATUS]    || 'DATANG').toString().trim().toUpperCase()
+            };
+        }).filter(p => p.timestamp).reverse(); // terbaru di atas
 
         filteredPresensi = [...allPresensi];
         presensiPage = 1;

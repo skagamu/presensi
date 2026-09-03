@@ -1,9 +1,10 @@
 // ============================================================
 //  Google Apps Script – Presensi RFID SMK GM 1 Wuryantoro
-//  Versi 3.3 – Standalone Script + Sheet Data Izin Terpisah
+//  Versi 3.4 – Standalone Script + Upload Bukti ke Google Drive
 // ============================================================
 
 var SPREADSHEET_ID = "1vrpYndWiuHcKbomBQO5in2EzMn94zinzu1EM5xifoFU";
+var DRIVE_FOLDER_ID = "1Pew4I4XVVB9kY-B4H9b6DcAR00qDmB2r";
 
 function getSpreadsheet() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -136,12 +137,12 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // ── 2. CATAT PERMOHONAN IZIN KERJA (ke sheet Data Izin saja)
+  // ── 2. CATAT PERMOHONAN IZIN KERJA (ke sheet Data Izin + Upload Drive)
   if (action === "logIzin") {
     var izinSheet = ss.getSheetByName("Data Izin");
     if (!izinSheet) {
       izinSheet = ss.insertSheet("Data Izin");
-      izinSheet.appendRow(["Timestamp Pengajuan", "Nama Lengkap", "Kedudukan / Peran", "Jenis Izin", "Hari / Tanggal Izin", "Alasan / Keterangan"]);
+      izinSheet.appendRow(["Timestamp Pengajuan", "Nama Lengkap", "Kedudukan / Peran", "Jenis Izin", "Hari / Tanggal Izin", "Alasan / Keterangan", "Link Bukti Dokumen"]);
     }
 
     // Ambil timestamp pengajuan saat ini
@@ -156,17 +157,44 @@ function doPost(e) {
       }
     } catch(e) {}
 
-    // Simpan hanya ke sheet "Data Izin"
+    // Upload file ke Google Drive jika ada
+    var fileUrl = "-";
+    if (data.fileData) {
+      try {
+        var folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
+        var base64Content = data.fileData;
+        var contentType = data.fileType || "image/jpeg";
+        
+        if (base64Content.indexOf("base64,") !== -1) {
+          base64Content = base64Content.split("base64,")[1];
+        }
+        
+        var decodedBlob = Utilities.newBlob(
+          Utilities.base64Decode(base64Content),
+          contentType,
+          (data.nama || "Izin") + "_" + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss") + (data.fileName ? "_" + data.fileName : ".jpg")
+        );
+        
+        var createdFile = folder.createFile(decodedBlob);
+        createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        fileUrl = createdFile.getUrl();
+      } catch(err) {
+        fileUrl = "Error upload: " + err.message;
+      }
+    }
+
+    // Simpan ke sheet "Data Izin"
     izinSheet.appendRow([
       timestampKirim,
       data.nama || "-",
       data.kedudukan || "GURU",
       data.jenis_izin || "-",
       hariTglIzin,
-      data.alasan || "-"
+      data.alasan || "-",
+      fileUrl
     ]);
 
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Tercatat di Data Izin" }))
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Tercatat di Data Izin", fileUrl: fileUrl }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 

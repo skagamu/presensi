@@ -1007,10 +1007,9 @@ function renderRekap() {
                 const hadir = !!times;
                 if (hadir) {
                     hadirCount++;
-                    if (times.izin && times.izin !== 'PULANG_AWAL') {
-                        if (times.izin === 'TERLAMBAT') terlambatCount++;
-                        else if (times.izin === 'TIDAK_MASUK') izinCount++;
-                    }
+                    const isLateCount = (() => { const p = times.datang.split(':'); return p.length===2 && (parseInt(p[0])*60+parseInt(p[1])) > (7*60+15); })();
+                    if (times.izin === 'TERLAMBAT' || isLateCount) terlambatCount++;
+                    if (times.izin === 'TIDAK_MASUK') izinCount++;
                 }
                 
                 if (hadir) {

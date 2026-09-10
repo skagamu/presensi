@@ -977,17 +977,20 @@ function renderRekap() {
     dates.forEach(d => {
         const isToday    = isSameDay(d, today);
         const isWknd     = isWeekend(d);
+        if (isWknd) return;
         const label      = rekapMode === 'mingguan'
             ? `${HARI_SHORT[d.getDay()]}<br><span style="font-size:0.85em;opacity:0.8">${d.getDate()}</span>`
             : `<span style="font-weight:800">${d.getDate()}</span><br><span style="font-size:0.75em;opacity:0.7">${HARI_SHORT[d.getDay()]}</span>`;
-        thead += `<th class="${isToday ? 'th-today' : ''}" ${isWknd && !isToday ? 'style="opacity:0.5"' : ''}>${label}</th>`;
+        thead += `<th class="${isToday ? 'th-today' : ''}">${label}</th>`;
     });
-    thead += '<th>Hadir</th></tr></thead>';
+    thead += '<th>Hadir</th><th>Izin</th><th>Terlambat</th></tr></thead>';
 
     // Build body
     let tbody = '<tbody>';
     students.forEach((s, idx) => {
         let hadirCount = 0;
+        let izinCount = 0;
+        let terlambatCount = 0;
         let cells = '';
         dates.forEach(d => {
             const k      = dateToKey(d);
@@ -995,15 +998,20 @@ function renderRekap() {
             const isWknd = isWeekend(d);
             const isToday= isSameDay(d, today);
 
-            if (isWknd) {
-                cells += `<td class="cell-libur ${isToday ? 'td-today' : ''}" title="Libur">–</td>`;
-            } else if (future) {
+            if (isWknd) return;
+            if (future) {
                 cells += `<td style="${isToday?'background:#eff6ff':''};color:#e2e8f0" title="Belum terjadi">·</td>`;
             } else {
                 const dayMap = attendanceMap.get(k);
                 const times = dayMap ? dayMap.get(s.rfid) : null;
                 const hadir = !!times;
-                if (hadir) hadirCount++;
+                if (hadir) {
+                    hadirCount++;
+                    if (times.izin && times.izin !== 'PULANG_AWAL') {
+                        if (times.izin === 'TERLAMBAT') terlambatCount++;
+                        else if (times.izin === 'TIDAK_MASUK') izinCount++;
+                    }
+                }
                 
                 if (hadir) {
                     if (times.izin === 'TIDAK_MASUK') {
@@ -1011,8 +1019,9 @@ function renderRekap() {
                     } else {
                         let infoD = times.izin === 'TERLAMBAT' ? ' <span style="color:#d97706;font-size:0.55rem;">(Izin)</span>' : '';
                         let infoP = times.izin === 'PULANG_AWAL' ? ' <span style="color:#d97706;font-size:0.55rem;">(Izin)</span>' : '';
+                        const isLate = (() => { const p = times.datang.split(':'); return p.length===2 && (parseInt(p[0])*60+parseInt(p[1])) > (7*60+15); })();
                         cells += `<td class="${isToday ? 'td-today' : ''}" style="line-height: 1.2; padding: 0.35rem 0.2rem;" title="Datang: ${times.datang}, Pulang: ${times.pulang}${times.izin ? " (Izin " + times.izin + ")" : ""}">
-                            <div style="font-weight: 700; color: var(--success); font-size: 0.68rem;">D: ${times.datang}${infoD}</div>
+                            <div style="font-weight: 700; color: ${isLate ? 'var(--danger)' : 'var(--success)'}; font-size: 0.68rem;">D: ${times.datang}${infoD}</div>
                             <div style="font-weight: 600; color: #475569; font-size: 0.68rem; border-top: 1px dashed var(--border); margin-top: 2px;">P: ${times.pulang}${infoP}</div>
                         </td>`;
                     }
@@ -1031,6 +1040,8 @@ function renderRekap() {
             <td><span class="rekap-no">${idx+1}</span><span class="rekap-name">${s.nama} <small style="color:var(--text-muted)">(${s.peran})</small></span></td>
             ${cells}
             <td><span class="${summaryClass}">${hadirCount}/${pastWorkDays}</span><br><span style="font-size:0.6rem;color:var(--text-muted)">${pct}%</span></td>
+            <td style="color:var(--accent);font-weight:700">${izinCount || '–'}</td>
+            <td style="color:var(--danger);font-weight:700">${terlambatCount || '–'}</td>
         </tr>`;
     });
     tbody += '</tbody>';

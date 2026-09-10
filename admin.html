@@ -932,7 +932,7 @@ function getPeriodDates() {
         const d = new Date(rekapDate);
         const day = d.getDay() === 0 ? 6 : d.getDay() - 1;
         d.setDate(d.getDate() - day);
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 5; i++) {
             dates.push(new Date(d));
             d.setDate(d.getDate() + 1);
         }
@@ -960,7 +960,7 @@ function renderRekap() {
 
     // Update label
     if (rekapMode === 'mingguan') {
-        const s = dates[0], e = dates[6];
+        const s = dates[0], e = dates[4];
         document.getElementById('periodLabel').textContent = `${formatDateID(s)} – ${formatDateID(e)} ${s.getFullYear()}`;
         document.getElementById('rekapTitle').textContent  = `Rekap Mingguan`;
     } else {
@@ -983,7 +983,7 @@ function renderRekap() {
             : `<span style="font-weight:800">${d.getDate()}</span><br><span style="font-size:0.75em;opacity:0.7">${HARI_SHORT[d.getDay()]}</span>`;
         thead += `<th class="${isToday ? 'th-today' : ''}">${label}</th>`;
     });
-    thead += '<th>Hadir</th><th>Izin</th><th>Terlambat</th></tr></thead>';
+    thead += '<th>Hadir</th><th>Izin</th><th>Terlambat</th><th>Tdk Hadir</th></tr></thead>';
 
     // Build body
     let tbody = '<tbody>';
@@ -991,6 +991,7 @@ function renderRekap() {
         let hadirCount = 0;
         let izinCount = 0;
         let terlambatCount = 0;
+        let tidakHadirCount = 0;
         let cells = '';
         dates.forEach(d => {
             const k      = dateToKey(d);
@@ -1025,6 +1026,7 @@ function renderRekap() {
                         </td>`;
                     }
                 } else {
+                    tidakHadirCount++;
                     cells += `<td class="${isToday ? 'td-today' : ''} cell-absen" title="Tidak Hadir">—</td>`;
                 }
             }
@@ -1041,6 +1043,7 @@ function renderRekap() {
             <td><span class="${summaryClass}">${hadirCount}/${pastWorkDays}</span><br><span style="font-size:0.6rem;color:var(--text-muted)">${pct}%</span></td>
             <td style="color:var(--accent);font-weight:700">${izinCount || '–'}</td>
             <td style="color:var(--danger);font-weight:700">${terlambatCount || '–'}</td>
+            <td style="color:#64748b;font-weight:700">${tidakHadirCount || '–'}</td>
         </tr>`;
     });
     tbody += '</tbody>';

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Preview Format PDF Rekap Presensi</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Arial', sans-serif; background: #e5e7eb; display: flex; flex-direction: column; align-items: center; padding: 2rem; gap: 2rem; }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    background: #fff;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    padding: 14mm 14mm 12mm 14mm;
+    display: flex;
+    flex-direction: column;
+    gap: 6mm;
+  }
+
+  /* HEADER */
+  .header { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 2px; }
+  .header-logo { width: 52px; height: 52px; background: #1e3a8a; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.4rem; flex-shrink: 0; }
+  .header-text { flex: 1; }
+  .header-text .school { font-size: 0.95rem; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.03em; }
+  .header-text .address { font-size: 0.62rem; color: #64748b; margin-top: 1px; }
+  .header-badge { text-align: right; }
+  .header-badge .doc-title { font-size: 0.75rem; font-weight: 700; color: #fff; background: #1e3a8a; padding: 3px 10px; border-radius: 4px; display: inline-block; }
+  .header-badge .doc-sub { font-size: 0.6rem; color: #64748b; margin-top: 3px; }
+
+  /* META INFO */
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; background: #f1f5f9; border-radius: 6px; padding: 8px 12px; }
+  .meta-item { display: flex; gap: 6px; font-size: 0.68rem; }
+  .meta-label { color: #64748b; font-weight: 600; min-width: 80px; }
+  .meta-value { color: #0f172a; font-weight: 700; }
+
+  /* STATS STRIP */
+  .stats-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .stat-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 8px; text-align: center; }
+  .stat-box .val { font-size: 1.3rem; font-weight: 800; color: #1e3a8a; line-height: 1; }
+  .stat-box .lbl { font-size: 0.55rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+  .stat-box.green .val { color: #16a34a; }
+  .stat-box.red .val { color: #dc2626; }
+  .stat-box.amber .val { color: #d97706; }
+  .stat-box.blue .val { color: #2563eb; }
+
+  /* TABLE */
+  .section-label { font-size: 0.7rem; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.08em; border-left: 3px solid #1e3a8a; padding-left: 7px; margin-bottom: 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.62rem; }
+  thead tr { background: #1e3a8a; color: #fff; }
+  thead th { padding: 5px 5px; text-align: center; font-weight: 700; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  thead th:first-child { text-align: left; padding-left: 8px; min-width: 130px; }
+  thead th.col-day { min-width: 28px; }
+
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:hover { background: #eff6ff; }
+  tbody td { padding: 4px 5px; text-align: center; border-bottom: 1px solid #e2e8f0; color: #374151; }
+  tbody td:first-child { text-align: left; padding-left: 8px; font-weight: 600; color: #0f172a; }
+
+  /* cell badges */
+  .cell-hadir { color: #16a34a; font-weight: 700; font-size: 0.6rem; }
+  .cell-hadir-late { color: #dc2626; font-weight: 700; font-size: 0.6rem; }
+  .cell-izin { color: #2563eb; font-weight: 700; font-size: 0.58rem; }
+  .cell-absen { color: #cbd5e1; font-size: 0.65rem; }
+  .cell-libur { color: #e2e8f0; font-size: 0.6rem; }
+
+  /* summary cols */
+  .col-hadir { background: #ecfdf5 !important; color: #16a34a !important; font-weight: 800; }
+  .col-izin   { background: #eff6ff !important; color: #2563eb !important; font-weight: 800; }
+  .col-terlambat { background: #fef2f2 !important; color: #dc2626 !important; font-weight: 800; }
+  .col-pct { font-weight: 700; font-size: 0.65rem; color: #374151; }
+
+  /* FOOTER */
+  .footer { margin-top: auto; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .footer-left { font-size: 0.58rem; color: #94a3b8; }
+  .sign-block { text-align: center; font-size: 0.62rem; }
+  .sign-block .sign-name { font-weight: 700; color: #0f172a; border-top: 1px solid #374151; padding-top: 3px; margin-top: 28px; min-width: 120px; display: inline-block; }
+  .sign-block .sign-role { font-size: 0.58rem; color: #64748b; }
+
+  /* print button */
+  .no-print { position: fixed; bottom: 2rem; right: 2rem; background: #1e3a8a; color: #fff; border: none; border-radius: 99px; padding: 0.75rem 1.5rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+  @media print { .no-print { display: none; } body { background: #fff; padding: 0; } .page { box-shadow: none; } }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Seal_of_Wonogiri_Regency.svg/200px-Seal_of_Wonogiri_Regency.svg.png" style="width:52px;height:52px;object-fit:contain;" onerror="this.style.display='none'">
+      <img src="https://smkn1wuryantoro.sch.id/favicon.ico" style="width:52px;height:52px;object-fit:contain;" onerror="this.style.display='none'">
+    </div>
+    <div class="header-text" style="text-align:center;">
+      <div style="font-size:0.6rem;font-weight:700;color:#1e3a8a;letter-spacing:0.08em;text-transform:uppercase;">PEMERINTAH KABUPATEN WONOGIRI</div>
+      <div class="school" style="font-size:1rem;">SMK NEGERI 1 WURYANTORO</div>
+      <div class="address">Jl. Raya Wuryantoro, Ds. Mojopuro, Kec. Wuryantoro, Kab. Wonogiri 57674</div>
+      <div class="address">Telp. (0273) 4398091 · www.smkn1wuryantoro.sch.id · smkn1wuryantoro@yahoo.co.id</div>
+    </div>
+    <div class="header-badge">
+      <div class="doc-title">REKAP PRESENSI</div>
+      <div class="doc-sub">Periode: September 2026</div>
+      <div class="doc-sub">Dicetak: 10/09/2026 08:30</div>
+    </div>
+  </div>
+
+  <!-- META -->
+  <div class="meta-grid">
+    <div class="meta-item"><span class="meta-label">Periode</span><span class="meta-value">September 2026</span></div>
+    <div class="meta-item"><span class="meta-label">Kelompok</span><span class="meta-value">Guru</span></div>
+    <div class="meta-item"><span class="meta-label">Hari Kerja</span><span class="meta-value">22 hari</span></div>
+    <div class="meta-item"><span class="meta-label">Batas Terlambat</span><span class="meta-value">> 07:15 WIB</span></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-strip">
+    <div class="stat-box"><div class="val">12</div><div class="lbl">Total Guru</div></div>
+    <div class="stat-box green"><div class="val">10</div><div class="lbl">Rata-rata Hadir</div></div>
+    <div class="stat-box red"><div class="val">2</div><div class="lbl">Rata-rata Absen</div></div>
+    <div class="stat-box amber"><div class="val">3</div><div class="lbl">Terlambat</div></div>
+    <div class="stat-box blue"><div class="val">1</div><div class="lbl">Izin</div></div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="section-label">Detail Kehadiran Per Individu</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nama Lengkap</th>
+        <th class="col-day">1<br><span style="font-weight:400;opacity:0.7">Sen</span></th>
+        <th class="col-day">2<br><span style="font-weight:400;opacity:0.7">Sel</span></th>
+        <th class="col-day">3<br><span style="font-weight:400;opacity:0.7">Rab</span></th>
+        <th class="col-day">4<br><span style="font-weight:400;opacity:0.7">Kam</span></th>
+        <th class="col-day">5<br><span style="font-weight:400;opacity:0.7">Jum</span></th>
+        <th class="col-day">8<br><span style="font-weight:400;opacity:0.7">Sen</span></th>
+        <th class="col-day">9<br><span style="font-weight:400;opacity:0.7">Sel</span></th>
+        <th class="col-day">10<br><span style="font-weight:400;opacity:0.7">Rab</span></th>
+        <th class="col-hadir">Hadir</th>
+        <th class="col-izin">Izin</th>
+        <th class="col-terlambat">Terlambat</th>
+        <th class="col-pct">%</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Agus Setiawan, S.Pd <small style="color:#94a3b8">(GURU)</small></td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir-late">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-absen">—</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="col-hadir">7</td>
+        <td class="col-izin">–</td>
+        <td class="col-terlambat">1</td>
+        <td class="col-pct">87%</td>
+      </tr>
+      <tr>
+        <td>Budi Santoso, S.Kom <small style="color:#94a3b8">(GURU)</small></td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-izin">IZN</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir-late">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="col-hadir">7</td>
+        <td class="col-izin">1</td>
+        <td class="col-terlambat">1</td>
+        <td class="col-pct">87%</td>
+      </tr>
+      <tr>
+        <td>Dewi Rahmawati, S.Pd <small style="color:#94a3b8">(GURU)</small></td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="col-hadir">8</td>
+        <td class="col-izin">–</td>
+        <td class="col-terlambat">–</td>
+        <td class="col-pct">100%</td>
+      </tr>
+      <tr>
+        <td>Eko Prasetyo, S.T <small style="color:#94a3b8">(GURU)</small></td>
+        <td class="cell-absen">—</td>
+        <td class="cell-absen">—</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir-late">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-absen">—</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="col-hadir">5</td>
+        <td class="col-izin">–</td>
+        <td class="col-terlambat">1</td>
+        <td class="col-pct">62%</td>
+      </tr>
+      <tr>
+        <td>Fitri Handayani, S.Pd <small style="color:#94a3b8">(GURU)</small></td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-izin">IZN</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-hadir">✓</td>
+        <td class="cell-absen">—</td>
+        <td class="cell-hadir">✓</td>
+        <td class="col-hadir">6</td>
+        <td class="col-izin">1</td>
+        <td class="col-terlambat">–</td>
+        <td class="col-pct">75%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- LEGEND -->
+  <div style="display:flex;gap:16px;font-size:0.58rem;color:#64748b;margin-top:2px;">
+    <span><b style="color:#16a34a">✓</b> Hadir tepat waktu</span>
+    <span><b style="color:#dc2626">✓</b> Hadir terlambat (> 07:15)</span>
+    <span><b style="color:#2563eb">IZN</b> Izin tidak masuk</span>
+    <span><b style="color:#cbd5e1">—</b> Tidak hadir</span>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">
+      Dicetak otomatis oleh Sistem Presensi RFID SMK GM 1 Wuryantoro<br>
+      © 2026 · Data bersumber dari Google Spreadsheet terintegrasi
+    </div>
+    <div class="sign-block">
+      <div>Wuryantoro, 10 September 2026</div>
+      <div style="margin-top:4px;font-size:0.58rem;color:#64748b">Kepala Sekolah</div>
+      <div class="sign-name">________________________</div>
+      <div class="sign-role">NIP. xxxxxxxxxxxxxx</div>
+    </div>
+  </div>
+
+</div>
+
+<button class="no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+
+</body>
+</html>

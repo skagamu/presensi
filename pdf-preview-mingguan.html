@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Preview PDF Rekap Mingguan – Portrait</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #e5e7eb; display: flex; flex-direction: column; align-items: center; padding: 2rem; gap: 2rem; }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    background: #fff;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    padding: 12mm 12mm 10mm 12mm;
+    display: flex;
+    flex-direction: column;
+    gap: 5mm;
+  }
+
+  /* HEADER */
+  .header { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 2px; }
+  .header-logos { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .header-logos img { width: 48px; height: 48px; object-fit: contain; }
+  .header-text { flex: 1; text-align: center; }
+  .header-text .gov { font-size: 0.58rem; font-weight: 700; color: #0f172a; letter-spacing: 0.08em; text-transform: uppercase; }
+  .header-text .school { font-size: 0.95rem; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.03em; }
+  .header-text .address { font-size: 0.58rem; color: #475569; margin-top: 2px; }
+  .header-badge { text-align: right; flex-shrink: 0; }
+  .header-badge .doc-title { font-size: 0.7rem; font-weight: 700; color: #fff; background: #1e3a8a; padding: 3px 10px; border-radius: 4px; display: inline-block; }
+  .header-badge .doc-sub { font-size: 0.58rem; color: #64748b; margin-top: 3px; }
+
+  /* META */
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 20px; background: #f1f5f9; border-radius: 6px; padding: 7px 12px; }
+  .meta-item { display: flex; gap: 6px; font-size: 0.65rem; }
+  .meta-label { color: #64748b; font-weight: 600; min-width: 90px; }
+  .meta-value { color: #0f172a; font-weight: 700; }
+
+  /* STATS */
+  .stats-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .stat-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 6px; text-align: center; }
+  .stat-box .val { font-size: 1.2rem; font-weight: 800; color: #1e3a8a; line-height: 1; }
+  .stat-box .lbl { font-size: 0.52rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+  .stat-box.green .val { color: #16a34a; }
+  .stat-box.red .val { color: #dc2626; }
+  .stat-box.amber .val { color: #d97706; }
+  .stat-box.blue .val { color: #2563eb; }
+
+  /* TABLE */
+  .section-label { font-size: 0.68rem; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.08em; border-left: 3px solid #1e3a8a; padding-left: 7px; margin-bottom: 3px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.68rem; }
+  thead tr { background: #1e3a8a; color: #fff; }
+  thead th { padding: 5px 4px; text-align: center; font-weight: 700; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; border-right: 1px solid #2d4fa3; }
+  thead th:first-child { text-align: left; padding-left: 8px; min-width: 140px; }
+  thead th.col-day { min-width: 80px; }
+  thead th.col-sum { min-width: 45px; background: #0f2a6b; }
+
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody td { padding: 4px 4px; text-align: center; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #f1f5f9; color: #374151; vertical-align: middle; }
+  tbody td:first-child { text-align: left; padding-left: 8px; font-weight: 600; color: #0f172a; border-right: 2px solid #e2e8f0; }
+
+  .cell-ok { color: #16a34a; font-weight: 700; font-size: 0.62rem; line-height: 1.3; }
+  .cell-late { color: #dc2626; font-weight: 700; font-size: 0.62rem; line-height: 1.3; }
+  .cell-izin { color: #2563eb; font-weight: 800; font-size: 0.6rem; }
+  .cell-absen { color: #cbd5e1; }
+  .time-label { font-size: 0.52rem; color: #94a3b8; display: block; }
+  .time-val-ok { font-size: 0.58rem; color: #16a34a; font-weight: 700; display: block; }
+  .time-val-late { font-size: 0.58rem; color: #dc2626; font-weight: 700; display: block; }
+  .time-val-p { font-size: 0.58rem; color: #475569; font-weight: 600; display: block; border-top: 1px dashed #e2e8f0; margin-top: 1px; }
+
+  .col-hadir { background: #ecfdf5 !important; color: #16a34a !important; font-weight: 800; }
+  .col-izin  { background: #eff6ff !important; color: #2563eb !important; font-weight: 800; }
+  .col-terlambat { background: #fef2f2 !important; color: #dc2626 !important; font-weight: 800; }
+  .col-pct { font-weight: 700; font-size: 0.62rem; }
+
+  /* LEGEND */
+  .legend { display: flex; gap: 14px; font-size: 0.56rem; color: #64748b; margin-top: 2px; }
+
+  /* FOOTER */
+  .footer { margin-top: auto; border-top: 1px solid #e2e8f0; padding-top: 6px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .footer-left { font-size: 0.55rem; color: #94a3b8; }
+  .sign-block { text-align: center; font-size: 0.6rem; }
+  .sign-block .sign-name { font-weight: 700; color: #0f172a; border-top: 1px solid #374151; padding-top: 3px; margin-top: 26px; min-width: 120px; display: inline-block; }
+  .sign-block .sign-role { font-size: 0.56rem; color: #64748b; }
+
+  .no-print { position: fixed; bottom: 2rem; right: 2rem; background: #1e3a8a; color: #fff; border: none; border-radius: 99px; padding: 0.75rem 1.5rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+  @media print {
+    .no-print { display: none; }
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; }
+    @page { size: A4 portrait; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logos">
+      <img src="./logo-skagamu.png" style="width:56px;height:56px;object-fit:contain;flex-shrink:0;">
+    </div>
+    <div class="header-text">
+      <div class="gov">YAYASAN PENDIDIKAN GAJAH MUNGKUR II WONOGIRI</div>
+      <div class="school">SMK GAJAH MUNGKUR 1 WURYANTORO</div>
+      <div class="address">Jl. Tangkil Tromol Pos 04 Wuryantoro, Wonogiri · Kode Pos 57661</div>
+    </div>
+    <div class="header-badge">
+      <div class="doc-title">REKAP MINGGUAN</div>
+      <div class="doc-sub">08 Sep – 12 Sep 2026</div>
+      <div class="doc-sub">Dicetak: 10/09/2026 08:30</div>
+    </div>
+  </div>
+
+  <!-- META -->
+  <div class="meta-grid">
+    <div class="meta-item"><span class="meta-label">Periode</span><span class="meta-value">08 – 12 September 2026</span></div>
+    <div class="meta-item"><span class="meta-label">Kelompok</span><span class="meta-value">Guru</span></div>
+    <div class="meta-item"><span class="meta-label">Hari Kerja</span><span class="meta-value">5 hari</span></div>
+    <div class="meta-item"><span class="meta-label">Batas Terlambat</span><span class="meta-value">> 07:15 WIB</span></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-strip">
+    <div class="stat-box"><div class="val">12</div><div class="lbl">Total Guru</div></div>
+    <div class="stat-box green"><div class="val">10</div><div class="lbl">Rata Hadir</div></div>
+    <div class="stat-box red"><div class="val">2</div><div class="lbl">Rata Absen</div></div>
+    <div class="stat-box amber"><div class="val">3</div><div class="lbl">Terlambat</div></div>
+    <div class="stat-box blue"><div class="val">1</div><div class="lbl">Izin</div></div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="section-label">Detail Kehadiran Per Individu</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nama Lengkap</th>
+        <th class="col-day">Sen 08/09<br><span style="font-weight:400;opacity:0.7">Senin</span></th>
+        <th class="col-day">Sel 09/09<br><span style="font-weight:400;opacity:0.7">Selasa</span></th>
+        <th class="col-day">Rab 10/09<br><span style="font-weight:400;opacity:0.7">Rabu</span></th>
+        <th class="col-day">Kam 11/09<br><span style="font-weight:400;opacity:0.7">Kamis</span></th>
+        <th class="col-day">Jum 12/09<br><span style="font-weight:400;opacity:0.7">Jumat</span></th>
+        <th class="col-sum col-hadir">Hadir</th>
+        <th class="col-sum col-izin">Izin</th>
+        <th class="col-sum col-terlambat">Tlmbt</th>
+        <th class="col-sum col-pct">%</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Agus Setiawan, S.Pd</td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:05</span><span class="time-label">P:</span><span class="time-val-p">15:32</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-late">07:28</span><span class="time-label">P:</span><span class="time-val-p">15:10</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">06:58</span><span class="time-label">P:</span><span class="time-val-p">15:45</span></td>
+        <td><span class="cell-absen">—</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:10</span><span class="time-label">P:</span><span class="time-val-p">14:30</span></td>
+        <td class="col-hadir">4</td>
+        <td class="col-izin">–</td>
+        <td class="col-terlambat">1</td>
+        <td class="col-pct">80%</td>
+      </tr>
+      <tr>
+        <td>Budi Santoso, S.Kom</td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:00</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:12</span><span class="time-label">P:</span><span class="time-val-p">15:30</span></td>
+        <td><span class="cell-izin">IZIN</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:05</span><span class="time-label">P:</span><span class="time-val-p">15:20</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-late">07:45</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td class="col-hadir">4</td>
+        <td class="col-izin">1</td>
+        <td class="col-terlambat">1</td>
+        <td class="col-pct">80%</td>
+      </tr>
+      <tr>
+        <td>Dewi Rahmawati, S.Pd</td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">06:55</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:10</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:00</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:05</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:08</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td class="col-hadir">5</td>
+        <td class="col-izin">–</td>
+        <td class="col-terlambat">–</td>
+        <td class="col-pct">100%</td>
+      </tr>
+      <tr>
+        <td>Eko Prasetyo, S.T</td>
+        <td><span class="cell-absen">—</span></td>
+        <td><span class="cell-absen">—</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:10</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-late">07:30</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:00</span><span class="time-label">P:</span><span class="time-val-p">14:30</span></td>
+        <td class="col-hadir">3</td>
+        <td class="col-izin">–</td>
+        <td class="col-terlambat">1</td>
+        <td class="col-pct">60%</td>
+      </tr>
+      <tr>
+        <td>Fitri Handayani, S.Pd</td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:05</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:10</span><span class="time-label">P:</span><span class="time-val-p">15:10</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:08</span><span class="time-label">P:</span><span class="time-val-p">15:00</span></td>
+        <td><span class="cell-izin">IZIN</span></td>
+        <td><span class="time-label">D:</span><span class="time-val-ok">07:02</span><span class="time-label">P:</span><span class="time-val-p">14:45</span></td>
+        <td class="col-hadir">4</td>
+        <td class="col-izin">1</td>
+        <td class="col-terlambat">–</td>
+        <td class="col-pct">80%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <span><b style="color:#16a34a">D: 07:xx</b> Datang tepat waktu</span>
+    <span><b style="color:#dc2626">D: 07:xx</b> Terlambat (> 07:15)</span>
+    <span><b style="color:#2563eb">IZIN</b> Izin tidak masuk</span>
+    <span><b style="color:#cbd5e1">—</b> Tidak hadir</span>
+    <span><b>P:</b> Jam pulang</span>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">
+      Dicetak otomatis oleh Sistem Presensi RFID SMK Negeri 1 Wuryantoro<br>
+      © 2026 · Data bersumber dari Google Spreadsheet terintegrasi
+    </div>
+    <div class="sign-block">
+      <div>Wuryantoro, 10 September 2026</div>
+      <div style="margin-top:3px;font-size:0.56rem;color:#64748b">Kepala Sekolah</div>
+      <div class="sign-name">________________________</div>
+      <div class="sign-role">NIP. xxxxxxxxxxxxxx</div>
+    </div>
+  </div>
+</div>
+
+<button class="no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+</body>
+</html>

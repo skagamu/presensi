@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Preview PDF Rekap Bulanan – Landscape</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #e5e7eb; display: flex; flex-direction: column; align-items: center; padding: 2rem; gap: 2rem; }
+
+  .page {
+    width: 297mm;
+    min-height: 210mm;
+    background: #fff;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+    padding: 10mm 10mm 8mm 10mm;
+    display: flex;
+    flex-direction: column;
+    gap: 4mm;
+  }
+
+  /* HEADER */
+  .header { display: flex; align-items: center; gap: 10px; border-bottom: 3px solid #1e3a8a; padding-bottom: 8px; }
+  .header-logos { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .header-logos img { width: 42px; height: 42px; object-fit: contain; }
+  .header-text { flex: 1; text-align: center; }
+  .header-text .gov { font-size: 0.55rem; font-weight: 700; color: #0f172a; letter-spacing: 0.08em; text-transform: uppercase; }
+  .header-text .school { font-size: 0.88rem; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.03em; }
+  .header-text .address { font-size: 0.55rem; color: #475569; margin-top: 1px; }
+  .header-badge { text-align: right; flex-shrink: 0; }
+  .header-badge .doc-title { font-size: 0.68rem; font-weight: 700; color: #fff; background: #1e3a8a; padding: 3px 10px; border-radius: 4px; display: inline-block; }
+  .header-badge .doc-sub { font-size: 0.55rem; color: #64748b; margin-top: 2px; }
+
+  /* META + STATS inline */
+  .meta-stats { display: flex; gap: 10px; align-items: stretch; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; background: #f1f5f9; border-radius: 6px; padding: 6px 10px; flex: 1; align-content: center; }
+  .meta-item { display: flex; gap: 5px; font-size: 0.6rem; }
+  .meta-label { color: #64748b; font-weight: 600; min-width: 80px; }
+  .meta-value { color: #0f172a; font-weight: 700; }
+  .stats-strip { display: flex; gap: 5px; }
+  .stat-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 8px; text-align: center; min-width: 52px; }
+  .stat-box .val { font-size: 1.1rem; font-weight: 800; color: #1e3a8a; line-height: 1; }
+  .stat-box .lbl { font-size: 0.48rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+  .stat-box.green .val { color: #16a34a; }
+  .stat-box.red .val { color: #dc2626; }
+  .stat-box.amber .val { color: #d97706; }
+  .stat-box.blue .val { color: #2563eb; }
+
+  /* TABLE */
+  .section-label { font-size: 0.62rem; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.08em; border-left: 3px solid #1e3a8a; padding-left: 6px; margin-bottom: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.52rem; }
+  thead tr { background: #1e3a8a; color: #fff; }
+  thead th { padding: 4px 2px; text-align: center; font-weight: 700; font-size: 0.5rem; text-transform: uppercase; white-space: nowrap; border-right: 1px solid #2d4fa3; line-height: 1.2; }
+  thead th:first-child { text-align: left; padding-left: 6px; min-width: 110px; max-width: 130px; }
+  thead th.col-day { min-width: 18px; max-width: 22px; }
+  thead th.col-sum { background: #0f2a6b; min-width: 28px; }
+
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody td { padding: 3px 2px; text-align: center; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #f1f5f9; color: #374151; font-size: 0.52rem; }
+  tbody td:first-child { text-align: left; padding-left: 6px; font-weight: 600; color: #0f172a; border-right: 2px solid #e2e8f0; font-size: 0.55rem; white-space: nowrap; overflow: hidden; max-width: 130px; }
+
+  .c-ok   { color: #16a34a; font-weight: 800; }
+  .c-late { color: #dc2626; font-weight: 800; }
+  .c-izin { color: #2563eb; font-weight: 800; font-size: 0.46rem; }
+  .c-abs  { color: #d1d5db; }
+
+  .col-hadir { background: #ecfdf5 !important; color: #16a34a !important; font-weight: 800; }
+  .col-izin  { background: #eff6ff !important; color: #2563eb !important; font-weight: 800; }
+  .col-terlambat { background: #fef2f2 !important; color: #dc2626 !important; font-weight: 800; }
+  .col-pct { font-weight: 700; }
+
+  /* LEGEND */
+  .legend { display: flex; gap: 16px; font-size: 0.52rem; color: #64748b; }
+
+  /* FOOTER */
+  .footer { margin-top: auto; border-top: 1px solid #e2e8f0; padding-top: 5px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .footer-left { font-size: 0.52rem; color: #94a3b8; }
+  .sign-block { text-align: center; font-size: 0.58rem; }
+  .sign-block .sign-name { font-weight: 700; color: #0f172a; border-top: 1px solid #374151; padding-top: 3px; margin-top: 22px; min-width: 110px; display: inline-block; }
+  .sign-block .sign-role { font-size: 0.52rem; color: #64748b; }
+
+  .no-print { position: fixed; bottom: 2rem; right: 2rem; background: #1e3a8a; color: #fff; border: none; border-radius: 99px; padding: 0.75rem 1.5rem; font-size: 0.85rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+  @media print {
+    .no-print { display: none; }
+    body { background: #fff; padding: 0; }
+    .page { box-shadow: none; }
+    @page { size: A4 landscape; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logos">
+      <img src="./logo-skagamu.png" style="width:48px;height:48px;object-fit:contain;flex-shrink:0;">
+    </div>
+    <div class="header-text">
+      <div class="gov">YAYASAN PENDIDIKAN GAJAH MUNGKUR II WONOGIRI</div>
+      <div class="school">SMK GAJAH MUNGKUR 1 WURYANTORO</div>
+      <div class="address">Jl. Tangkil Tromol Pos 04 Wuryantoro, Wonogiri · Kode Pos 57661</div>
+    </div>
+    <div class="header-badge">
+      <div class="doc-title">REKAP BULANAN</div>
+      <div class="doc-sub">September 2026</div>
+      <div class="doc-sub">Dicetak: 10/09/2026 08:30</div>
+    </div>
+  </div>
+
+  <!-- META + STATS -->
+  <div class="meta-stats">
+    <div class="meta-grid">
+      <div class="meta-item"><span class="meta-label">Periode</span><span class="meta-value">September 2026</span></div>
+      <div class="meta-item"><span class="meta-label">Kelompok</span><span class="meta-value">Guru</span></div>
+      <div class="meta-item"><span class="meta-label">Hari Kerja</span><span class="meta-value">22 hari</span></div>
+      <div class="meta-item"><span class="meta-label">Batas Terlambat</span><span class="meta-value">> 07:15 WIB</span></div>
+    </div>
+    <div class="stats-strip">
+      <div class="stat-box"><div class="val">12</div><div class="lbl">Total</div></div>
+      <div class="stat-box green"><div class="val">10</div><div class="lbl">Hadir</div></div>
+      <div class="stat-box red"><div class="val">2</div><div class="lbl">Absen</div></div>
+      <div class="stat-box amber"><div class="val">3</div><div class="lbl">Tlmbt</div></div>
+      <div class="stat-box blue"><div class="val">1</div><div class="lbl">Izin</div></div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="section-label">Rekap Kehadiran Bulanan – September 2026</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Nama Lengkap</th>
+        <!-- Senin-Jumat Sep 2026, skip Sabtu/Minggu -->
+        <th class="col-day">1<br>Sen</th>
+        <th class="col-day">2<br>Sel</th>
+        <th class="col-day">3<br>Rab</th>
+        <th class="col-day">4<br>Kam</th>
+        <th class="col-day">5<br>Jum</th>
+        <th class="col-day">8<br>Sen</th>
+        <th class="col-day">9<br>Sel</th>
+        <th class="col-day">10<br>Rab</th>
+        <th class="col-day">11<br>Kam</th>
+        <th class="col-day">12<br>Jum</th>
+        <th class="col-day">15<br>Sen</th>
+        <th class="col-day">16<br>Sel</th>
+        <th class="col-day">17<br>Rab</th>
+        <th class="col-day">18<br>Kam</th>
+        <th class="col-day">19<br>Jum</th>
+        <th class="col-day">22<br>Sen</th>
+        <th class="col-day">23<br>Sel</th>
+        <th class="col-day">24<br>Rab</th>
+        <th class="col-day">25<br>Kam</th>
+        <th class="col-day">26<br>Jum</th>
+        <th class="col-day">29<br>Sen</th>
+        <th class="col-day">30<br>Sel</th>
+        <th class="col-sum col-hadir">Hdr</th>
+        <th class="col-sum col-izin">Izin</th>
+        <th class="col-sum col-terlambat">Tlm</th>
+        <th class="col-sum col-pct">%</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Agus Setiawan, S.Pd</td>
+        <td class="c-ok">✓</td><td class="c-late">✓</td><td class="c-ok">✓</td><td class="c-abs">—</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-late">✓</td><td class="c-ok">✓</td><td class="c-abs">—</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-abs">—</td><td class="c-izin">IZN</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-late">✓</td><td class="c-ok">✓</td><td class="c-abs">—</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="col-hadir">17</td><td class="col-izin">1</td><td class="col-terlambat">3</td><td class="col-pct">77%</td>
+      </tr>
+      <tr>
+        <td>Budi Santoso, S.Kom</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-izin">IZN</td><td class="c-ok">✓</td><td class="c-late">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-abs">—</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="col-hadir">19</td><td class="col-izin">1</td><td class="col-terlambat">1</td><td class="col-pct">86%</td>
+      </tr>
+      <tr>
+        <td>Dewi Rahmawati, S.Pd</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="col-hadir">22</td><td class="col-izin">–</td><td class="col-terlambat">–</td><td class="col-pct">100%</td>
+      </tr>
+      <tr>
+        <td>Eko Prasetyo, S.T</td>
+        <td class="c-abs">—</td><td class="c-abs">—</td><td class="c-ok">✓</td><td class="c-late">✓</td><td class="c-ok">✓</td>
+        <td class="c-abs">—</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-late">✓</td><td class="c-ok">✓</td><td class="c-abs">—</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-abs">—</td><td class="c-ok">✓</td>
+        <td class="col-hadir">16</td><td class="col-izin">–</td><td class="col-terlambat">2</td><td class="col-pct">73%</td>
+      </tr>
+      <tr>
+        <td>Fitri Handayani, S.Pd</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-izin">IZN</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-abs">—</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="c-ok">✓</td><td class="c-ok">✓</td>
+        <td class="col-hadir">20</td><td class="col-izin">1</td><td class="col-terlambat">–</td><td class="col-pct">91%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <span><b style="color:#16a34a">✓</b> Hadir tepat waktu</span>
+    <span><b style="color:#dc2626">✓</b> Hadir terlambat (> 07:15)</span>
+    <span><b style="color:#2563eb">IZN</b> Izin tidak masuk</span>
+    <span><b style="color:#d1d5db">—</b> Tidak hadir</span>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">
+      Dicetak otomatis oleh Sistem Presensi RFID SMK Negeri 1 Wuryantoro<br>
+      © 2026 · Data bersumber dari Google Spreadsheet terintegrasi
+    </div>
+    <div class="sign-block">
+      <div>Wuryantoro, 10 September 2026</div>
+      <div style="margin-top:3px;font-size:0.52rem;color:#64748b">Kepala Sekolah</div>
+      <div class="sign-name">________________________</div>
+      <div class="sign-role">NIP. xxxxxxxxxxxxxx</div>
+    </div>
+  </div>
+</div>
+
+<button class="no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+</body>
+</html>

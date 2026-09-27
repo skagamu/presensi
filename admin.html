@@ -1248,12 +1248,9 @@ function exportRekapPDF() {
 
                 if (times.izin === 'TIDAK_MASUK') {
                     cells += `<td class="c-izin">IZN</td>`;
-                } else if (isMingguan) {
-                    const isLate = (() => { const p = times.datang.split(':'); return p.length===2 && (parseInt(p[0])*60+parseInt(p[1])) > (7*60+15); })();
-                    cells += `<td><span class="time-label">D:</span><span class="${isLate ? 'time-val-late' : 'time-val-ok'}">${times.datang}</span><span class="time-label">P:</span><span class="time-val-p">${times.pulang}</span></td>`;
                 } else {
                     const isLate = (() => { const p = times.datang.split(':'); return p.length===2 && (parseInt(p[0])*60+parseInt(p[1])) > (7*60+15); })();
-                    cells += `<td class="${isLate ? 'c-late' : 'c-ok'}">✓</td>`;
+                    cells += `<td><span class="time-label">D:</span><span class="${isLate ? 'time-val-late' : 'time-val-ok'}">${times.datang}</span><span class="time-label">P:</span><span class="time-val-p">${times.pulang}</span></td>`;
                 }
             } else {
                 tidakHadirCount++;
@@ -1277,7 +1274,7 @@ function exportRekapPDF() {
     });
 
     const pageSize      = isMingguan ? 'A4 portrait' : 'A4 landscape';
-    const colDayW       = isMingguan ? '54px' : 'auto';
+    const colDayW       = isMingguan ? '54px' : '38px';
     const colSumW       = isMingguan ? '34px' : '22px';
     const colPctW       = isMingguan ? '32px' : '22px';
     const colNamaW      = isMingguan ? '160px' : '120px';
@@ -1514,10 +1511,7 @@ tbody td.col-pct   { font-weight: 800; }
   </table>
 
   <div class="legend">
-    ${isMingguan
-      ? '<span><b style="color:#16a34a">D: 07:xx</b> Tepat waktu</span><span><b style="color:#dc2626">D: 07:xx</b> Terlambat (&gt;07:15)</span><span><b style="color:#2563eb">IZN</b> Izin tidak masuk</span><span><b style="color:#cbd5e1">—</b> Tidak hadir</span><span><b>P:</b> Jam pulang</span>'
-      : '<span><b style="color:#16a34a">✓</b> Tepat waktu</span><span><b style="color:#dc2626">✓</b> Terlambat (&gt;07:15)</span><span><b style="color:#2563eb">IZN</b> Izin tidak masuk</span><span><b style="color:#cbd5e1">—</b> Tidak hadir</span>'
-    }
+    <span><b style="color:#16a34a">D: 07:xx</b> Tepat waktu</span><span><b style="color:#dc2626">D: 07:xx</b> Terlambat (&gt;07:15)</span><span><b style="color:#2563eb">IZN</b> Izin tidak masuk</span><span><b style="color:#cbd5e1">—</b> Tidak hadir</span><span><b>P:</b> Jam pulang</span>
   </div>
 
   <div class="footer">

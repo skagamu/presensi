@@ -1,4 +1,4 @@
-const CACHE_NAME = 'presensi-rfid-v5';
+const CACHE_NAME = 'presensi-rfid-v6';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

@@ -223,6 +223,7 @@
         <div class="nav-item" onclick="showPage('presensi')" id="nav-presensi"><span class="nav-icon">📋</span><span>Log Presensi</span></div>
         <div class="nav-item" onclick="showPage('rekap')" id="nav-rekap"><span class="nav-icon">📅</span><span>Rekap Kehadiran</span></div>
         <div class="nav-item" onclick="showPage('database')" id="nav-database"><span class="nav-icon">👤</span><span>Data Pengguna</span></div>
+        <div class="nav-item" onclick="showPage('input-izin')" id="nav-input-izin"><span class="nav-icon">📝</span><span>Input Izin / DL</span></div>
     </div>
     <div class="sidebar-footer">
         <a href="index.html" class="back-btn"><span>←</span><span>Kembali ke Scanner</span></a>
@@ -407,6 +408,43 @@
             <div class="pagination" id="databasePagination"></div>
         </div>
     </div>
+    <!-- ═══ INPUT IZIN / DINAS LUAR -->
+    <div class="page" id="page-input-izin">
+        <div class="section-card">
+            <div class="section-header">
+                <div class="section-title">📝 Input Izin / Dinas Luar</div>
+            </div>
+            <div style="max-width:760px;padding:1.25rem">
+                <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:1.25rem">Catat izin atau tugas sekolah untuk guru dan karyawan. Data akan masuk ke Data Izin, Log Presensi, dan rekap kehadiran.</p>
+                <form id="adminIzinForm" onsubmit="submitAdminIzin(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="adminIzinPegawai">Guru / Karyawan</label>
+                        <select class="form-input" id="adminIzinPegawai" required><option value="">Pilih guru atau karyawan...</option></select>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem">
+                        <div class="form-group">
+                            <label class="form-label" for="adminIzinJenis">Jenis</label>
+                            <select class="form-input" id="adminIzinJenis" required>
+                                <option value="Dinas Luar">Dinas Luar (DL)</option>
+                                <option value="Izin Tidak Masuk">Izin Tidak Masuk</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="adminIzinTanggal">Tanggal tugas / izin</label>
+                            <input class="form-input" type="date" id="adminIzinTanggal" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="adminIzinAlasan">Keterangan tugas sekolah / alasan</label>
+                        <textarea class="form-input" id="adminIzinAlasan" rows="4" maxlength="500" placeholder="Contoh: Mengawasi TKA di sekolah lain" required style="resize:vertical"></textarea>
+                    </div>
+                    <div style="display:flex;justify-content:flex-end;margin-top:1.25rem">
+                        <button class="btn btn-primary" type="submit" id="btnKirimAdminIzin">📨 Simpan ke Data Izin</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- ═══ MODAL TAMBAH GURU & SISWA -->
@@ -493,7 +531,7 @@ let attendanceMap    = new Map();  // "YYYY-MM-DD" → Set<rfid>
 // ═══════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════
-const pageTitles = { dashboard:'Dashboard', presensi:'Log Presensi', rekap:'Rekap Kehadiran', database:'Data Pengguna' };
+const pageTitles = { dashboard:'Dashboard', presensi:'Log Presensi', rekap:'Rekap Kehadiran', database:'Data Pengguna', 'input-izin':'Input Izin / Dinas Luar' };
 
 function showPage(name) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -502,6 +540,11 @@ function showPage(name) {
     document.getElementById('nav-' + name).classList.add('active');
     document.getElementById('topbarTitle').textContent = pageTitles[name];
     if (name === 'rekap') renderRekap();
+    if (name === 'input-izin') {
+        populateAdminIzinUsers();
+        const dateField = document.getElementById('adminIzinTanggal');
+        if (!dateField.value) dateField.value = todayISODate();
+    }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -623,6 +666,61 @@ async function loadPresensi() {
     }
 }
 
+function todayISODate() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function populateAdminIzinUsers() {
+    const select = document.getElementById('adminIzinPegawai');
+    if (!select) return;
+    const selected = select.value;
+    const staff = allDatabase
+        .filter(s => s.peran === 'GURU' || s.peran === 'STAF TU')
+        .sort((a, b) => a.nama.localeCompare(b.nama));
+    select.replaceChildren(new Option('Pilih guru atau karyawan...', ''));
+    staff.forEach(s => select.add(new Option(`${s.nama} — ${s.peran}`, s.rfid)));
+    if (staff.some(s => s.rfid === selected)) select.value = selected;
+}
+
+async function submitAdminIzin(event) {
+    event.preventDefault();
+    const pegawai = allDatabase.find(s => s.rfid === document.getElementById('adminIzinPegawai').value);
+    const tanggal = document.getElementById('adminIzinTanggal').value;
+    const jenis = document.getElementById('adminIzinJenis').value;
+    const alasan = document.getElementById('adminIzinAlasan').value.trim();
+    const button = document.getElementById('btnKirimAdminIzin');
+
+    if (!pegawai || !tanggal || !alasan) {
+        showToast('Lengkapi nama, tanggal, dan keterangan.', 'error');
+        return;
+    }
+
+    button.disabled = true;
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: 'logIzin',
+                nama: pegawai.nama,
+                kedudukan: pegawai.peran,
+                jenis_izin: jenis,
+                hari_tgl: tanggal,
+                alasan: alasan
+            })
+        });
+        showToast('Data tugas sekolah / izin dikirim ke Data Izin.', 'success');
+        document.getElementById('adminIzinForm').reset();
+        document.getElementById('adminIzinTanggal').value = todayISODate();
+        setTimeout(loadPresensi, 1200);
+    } catch (e) {
+        showToast('Gagal mengirim data. Periksa koneksi lalu coba lagi.', 'error');
+    } finally {
+        button.disabled = false;
+    }
+}
+
 async function loadDatabase() {
     document.getElementById('databaseBody').innerHTML =
         '<tr class="loading-row"><td colspan="5"><span class="spinner"></span>Memuat data pengguna...</td></tr>';
@@ -635,6 +733,7 @@ async function loadDatabase() {
             peran    : (r[2] || 'SISWA').toString().trim().toUpperCase(),
             rowIndex : i + 2
         })).filter(s => s.rfid);
+        populateAdminIzinUsers();
         filteredDb = [...allDatabase];
         dbPage = 1;
         renderDatabaseTable();

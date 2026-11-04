@@ -64,7 +64,9 @@ function doGet(e) {
 
           var jenis = (r[3] || "").toString().toLowerCase();
           var statusIzin = "IZIN (TIDAK MASUK)";
-          if (jenis.indexOf("terlambat") !== -1) {
+          if (jenis.indexOf("dinas luar") !== -1) {
+            statusIzin = "IZIN (DINAS LUAR)";
+          } else if (jenis.indexOf("terlambat") !== -1) {
             statusIzin = "IZIN (TERLAMBAT)";
           } else if (jenis.indexOf("pulang") !== -1 || jenis.indexOf("awal") !== -1) {
             statusIzin = "IZIN (PULANG AWAL)";

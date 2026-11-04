@@ -148,6 +148,113 @@ function doPost(e) {
   
   var action = data.action || "logPresensi";
 
+  // ── Catat izin / Dinas Luar untuk beberapa guru-karyawan sekaligus
+  if (action === "logIzinBulk") {
+    var records = Array.isArray(data.records) ? data.records : [];
+    if (!records.length || records.length > 100) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "error",
+        message: "Pilih 1 sampai 100 guru/karyawan."
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var izinSheet = ss.getSheetByName("Data Izin");
+    if (!izinSheet) {
+      izinSheet = ss.insertSheet("Data Izin");
+      izinSheet.appendRow(["TIMESTAMP", "NAMA", "KEDUDUKAN", "JENIS IZIN", "HARI/TANGGAL", "ALASAN/KETERANGAN", "LINK BUKTI FOTO"]);
+    }
+
+    var dbSheet = ss.getSheetByName("Database");
+    var dbRows = dbSheet ? dbSheet.getDataRange().getValues() : [];
+    var staffByRfid = {};
+    for (var i = 1; i < dbRows.length; i++) {
+      var staffRfid = (dbRows[i][0] || "").toString().trim().replace(/^'+/, "");
+      var staffRole = (dbRows[i][2] || "").toString().trim().toUpperCase();
+      if (staffRfid && (staffRole === "GURU" || staffRole === "STAF TU")) {
+        staffByRfid[staffRfid] = {
+          nama: (dbRows[i][1] || "").toString().trim(),
+          peran: staffRole
+        };
+      }
+    }
+
+    var seenRfid = {};
+    var timestampKirim = "'" + Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy, HH:mm:ss");
+    var rowsToWrite = [];
+    for (var j = 0; j < records.length; j++) {
+      var record = records[j] || {};
+      var rfid = (record.rfid_id || "").toString().trim().replace(/^'+/, "");
+      var staff = staffByRfid[rfid];
+      var jenis = (record.jenis_izin || "").toString().trim();
+      var dateValue = (record.hari_tgl || "").toString().trim();
+      var alasan = (record.alasan || "").toString().trim();
+
+      if (!staff || seenRfid[rfid]) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "error",
+          message: "Daftar guru/karyawan tidak valid atau ada nama yang terpilih lebih dari sekali."
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (jenis !== "Dinas Luar" && jenis !== "Izin Tidak Masuk") {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "error",
+          message: "Jenis izin tidak dikenali."
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      var dateMatch = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!dateMatch) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "error",
+          message: "Tanggal harus diisi dengan benar."
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      var year = Number(dateMatch[1]);
+      var month = Number(dateMatch[2]);
+      var day = Number(dateMatch[3]);
+      var checkDate = new Date(Date.UTC(year, month - 1, day));
+      if (checkDate.getUTCFullYear() !== year || checkDate.getUTCMonth() !== month - 1 || checkDate.getUTCDate() !== day) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "error",
+          message: "Tanggal tidak valid."
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+      if (!alasan || alasan.length > 500) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "error",
+          message: "Keterangan wajib diisi dan maksimal 500 karakter."
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      seenRfid[rfid] = true;
+      rowsToWrite.push([
+        timestampKirim,
+        staff.nama,
+        staff.peran,
+        jenis,
+        "'" + dateMatch[3] + "/" + dateMatch[2] + "/" + dateMatch[1],
+        alasan,
+        "-"
+      ]);
+    }
+
+    var lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      var firstRow = izinSheet.getLastRow() + 1;
+      izinSheet.getRange(firstRow, 1, rowsToWrite.length, 7).setValues(rowsToWrite);
+      izinSheet.setRowHeights(firstRow, rowsToWrite.length, 80);
+    } finally {
+      lock.releaseLock();
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      inserted: rowsToWrite.length,
+      message: "Catatan izin massal berhasil disimpan."
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   // ── 1. CATAT PRESENSI SCANNER RFID
   if (action === "logPresensi") {
     var logSheet = ss.getSheetByName("Presensi");

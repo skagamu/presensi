@@ -224,6 +224,7 @@
         <div class="nav-item" onclick="showPage('rekap')" id="nav-rekap"><span class="nav-icon">📅</span><span>Rekap Kehadiran</span></div>
         <div class="nav-item" onclick="showPage('database')" id="nav-database"><span class="nav-icon">👤</span><span>Data Pengguna</span></div>
         <div class="nav-item" onclick="showPage('input-izin')" id="nav-input-izin"><span class="nav-icon">📝</span><span>Input Izin / DL</span></div>
+        <div class="nav-item" onclick="showPage('input-izin')" id="nav-input-izin"><span class="nav-icon">📝</span><span>Input Izin / DL</span></div>
     </div>
     <div class="sidebar-footer">
         <a href="index.html" class="back-btn"><span>←</span><span>Kembali ke Scanner</span></a>
@@ -418,9 +419,14 @@
                 <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:1.25rem">Catat izin atau tugas sekolah untuk guru dan karyawan. Data akan masuk ke Data Izin, Log Presensi, dan rekap kehadiran.</p>
                 <form id="adminIzinForm" onsubmit="submitAdminIzin(event)">
                     <div class="form-group">
-                        <label class="form-label" for="adminIzinPegawai">Guru / Karyawan</label>
-                        <select class="form-input" id="adminIzinPegawai" required><option value="">Pilih guru atau karyawan...</option></select>
-                    </div>
+                        <label class="form-label" for="adminIzinStaffSearch">Guru / Karyawan (bisa pilih beberapa)</label>
+                        <input class="form-input" type="search" id="adminIzinStaffSearch" placeholder="Cari nama..." oninput="filterAdminIzinStaff()" autocomplete="off">
+                        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.6rem 0">
+                            <button class="btn btn-outline btn-sm" type="button" onclick="setVisibleAdminIzinStaff(true)">Pilih yang terlihat</button>
+                            <button class="btn btn-outline btn-sm" type="button" onclick="setVisibleAdminIzinStaff(false)">Kosongkan pilihan</button>
+                            <span id="adminIzinSelectedCount" style="font-size:.75rem;color:var(--text-muted)">0 dipilih</span>
+                        </div>
+                        <div id="adminIzinPegawaiList" role="group" aria-label="Pilih guru atau karyawan" style="max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:.6rem;padding:.35rem"></div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem">
                         <div class="form-group">
                             <label class="form-label" for="adminIzinJenis">Jenis</label>
@@ -672,27 +678,71 @@ function todayISODate() {
 }
 
 function populateAdminIzinUsers() {
-    const select = document.getElementById('adminIzinPegawai');
-    if (!select) return;
-    const selected = select.value;
+    const list = document.getElementById('adminIzinPegawaiList');
+    if (!list) return;
     const staff = allDatabase
         .filter(s => s.peran === 'GURU' || s.peran === 'STAF TU')
         .sort((a, b) => a.nama.localeCompare(b.nama));
-    select.replaceChildren(new Option('Pilih guru atau karyawan...', ''));
-    staff.forEach(s => select.add(new Option(`${s.nama} — ${s.peran}`, s.rfid)));
-    if (staff.some(s => s.rfid === selected)) select.value = selected;
+    list.replaceChildren();
+    if (!staff.length) {
+        const empty = document.createElement('div');
+        empty.textContent = 'Data guru/karyawan belum tersedia.';
+        empty.style.cssText = 'padding:.75rem;color:var(--text-muted);font-size:.8rem';
+        list.appendChild(empty);
+        updateAdminIzinSelectedCount();
+        return;
+    }
+    staff.forEach(s => {
+        const label = document.createElement('label');
+        label.className = 'admin-izin-staff-option';
+        label.style.cssText = 'display:flex;align-items:center;gap:.65rem;padding:.55rem .65rem;border-radius:.4rem;cursor:pointer;font-size:.82rem';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'admin-izin-staff-checkbox';
+        checkbox.value = s.rfid;
+        checkbox.addEventListener('change', updateAdminIzinSelectedCount);
+        const name = document.createElement('span');
+        name.textContent = `${s.nama} — ${s.peran}`;
+        label.append(checkbox, name);
+        list.appendChild(label);
+    });
+    filterAdminIzinStaff();
+    updateAdminIzinSelectedCount();
+}
+
+function filterAdminIzinStaff() {
+    const query = document.getElementById('adminIzinStaffSearch').value.trim().toLowerCase();
+    document.querySelectorAll('.admin-izin-staff-option').forEach(option => {
+        option.style.display = option.textContent.toLowerCase().includes(query) ? 'flex' : 'none';
+    });
+}
+
+function setVisibleAdminIzinStaff(checked) {
+    document.querySelectorAll('.admin-izin-staff-option').forEach(option => {
+        if (!checked || option.style.display !== 'none') option.querySelector('input').checked = checked;
+    });
+    updateAdminIzinSelectedCount();
+}
+
+function updateAdminIzinSelectedCount() {
+    const count = document.querySelectorAll('.admin-izin-staff-checkbox:checked').length;
+    const label = document.getElementById('adminIzinSelectedCount');
+    if (label) label.textContent = `${count} dipilih`;
 }
 
 async function submitAdminIzin(event) {
     event.preventDefault();
-    const pegawai = allDatabase.find(s => s.rfid === document.getElementById('adminIzinPegawai').value);
+    const selectedRfids = new Set(
+        [...document.querySelectorAll('.admin-izin-staff-checkbox:checked')].map(input => input.value)
+    );
+    const staff = allDatabase.filter(s => selectedRfids.has(s.rfid));
     const tanggal = document.getElementById('adminIzinTanggal').value;
     const jenis = document.getElementById('adminIzinJenis').value;
     const alasan = document.getElementById('adminIzinAlasan').value.trim();
     const button = document.getElementById('btnKirimAdminIzin');
 
-    if (!pegawai || !tanggal || !alasan) {
-        showToast('Lengkapi nama, tanggal, dan keterangan.', 'error');
+    if (!staff.length || !tanggal || !alasan) {
+        showToast('Pilih minimal satu guru/karyawan dan lengkapi tanggal serta keterangan.', 'error');
         return;
     }
 
@@ -702,17 +752,19 @@ async function submitAdminIzin(event) {
             method: 'POST',
             mode: 'no-cors',
             body: JSON.stringify({
-                action: 'logIzin',
-                nama: pegawai.nama,
-                kedudukan: pegawai.peran,
-                jenis_izin: jenis,
-                hari_tgl: tanggal,
-                alasan: alasan
+                action: 'logIzinBulk',
+                records: staff.map(pegawai => ({
+                    rfid_id: pegawai.rfid,
+                    jenis_izin: jenis,
+                    hari_tgl: tanggal,
+                    alasan: alasan
+                }))
             })
         });
-        showToast('Data tugas sekolah / izin dikirim ke Data Izin.', 'success');
+        showToast(`${staff.length} catatan tugas sekolah / izin dikirim ke Data Izin.`, 'success');
         document.getElementById('adminIzinForm').reset();
         document.getElementById('adminIzinTanggal').value = todayISODate();
+        updateAdminIzinSelectedCount();
         setTimeout(loadPresensi, 1200);
     } catch (e) {
         showToast('Gagal mengirim data. Periksa koneksi lalu coba lagi.', 'error');

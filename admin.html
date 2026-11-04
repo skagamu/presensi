@@ -1004,11 +1004,13 @@ function renderRekap() {
             const isToday= isSameDay(d, today);
 
             if (isWknd) return;
-            if (future) {
+            const dayMap = attendanceMap.get(k);
+            const times = dayMap ? dayMap.get(s.rfid) : null;
+            if (future && (!times || times.izin !== 'DINAS_LUAR')) {
                 cells += `<td style="${isToday?'background:#eff6ff':''};color:#e2e8f0" title="Belum terjadi">·</td>`;
+            } else if (future) {
+                cells += `<td style="${isToday?'background:#eff6ff':''};background:#eff6ff;color:#2563eb;font-weight:800;font-size:0.65rem;text-align:center;padding:0.4rem 0.2rem;" title="Dinas Luar">DL</td>`;
             } else {
-                const dayMap = attendanceMap.get(k);
-                const times = dayMap ? dayMap.get(s.rfid) : null;
                 const hadir = !!times;
                 if (hadir) {
                     hadirCount++;
@@ -1240,12 +1242,16 @@ function exportRekapPDF() {
         workDates.forEach(d => {
             const k = dateToKey(d);
             const future = d > today;
-            if (future) {
+            const dayMap = attendanceMap.get(k);
+            const times  = dayMap ? dayMap.get(s.rfid) : null;
+            if (future && (!times || times.izin !== 'DINAS_LUAR')) {
                 cells += `<td style="color:#cbd5e1">·</td>`;
                 return;
             }
-            const dayMap = attendanceMap.get(k);
-            const times  = dayMap ? dayMap.get(s.rfid) : null;
+            if (future && times.izin === 'DINAS_LUAR') {
+                cells += `<td class="c-izin" title="Dinas Luar">DL</td>`;
+                return;
+            }
             const hadir  = !!times;
 
             if (hadir) {

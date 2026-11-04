@@ -696,12 +696,13 @@ function updateDashRecent() {
     body.innerHTML = recent.map(p => {
         const isTamu = !p.nama || p.nama.toLowerCase() === 'tamu/asing';
         let statusBadge = p.status === "DATANG" ? "badge-success" : (p.status.startsWith("IZIN") ? "badge-info" : "badge-warning");
+        const statusLabel = p.status === 'IZIN (DINAS LUAR)' ? 'Dinas Luar' : p.status;
         return `<tr>
             <td class="td-mono">${p.timestamp}</td>
             <td class="td-mono">${p.rfid}</td>
             <td class="td-name">${isTamu ? '<i style="color:var(--text-muted);font-weight:400">Kartu Tidak Dikenal</i>' : p.nama}</td>
             <td><span class="badge ${isTamu ? 'badge-warning' : 'badge-success'}">${isTamu ? 'TAMU' : p.peran}</span></td>
-            <td><span class="badge ${statusBadge}">${p.status}</span></td>
+            <td><span class="badge ${statusBadge}">${statusLabel}</span></td>
         </tr>`;
     }).join('');
 }
@@ -719,7 +720,7 @@ function applyPresensiFilters() {
     filteredPresensi = allPresensi.filter(p => {
         const matchQ = !q || p.nama.toLowerCase().includes(q) || p.rfid.toLowerCase().includes(q) || p.timestamp.includes(q);
         const matchPeran = !peran || p.peran === peran;
-        const matchStatus = !status || p.status === status;
+        const matchStatus = !status || p.status === status || (status === 'IZIN' && p.status.startsWith('IZIN'));
         let matchD = true;
         if (dari || sampai) {
             const d = parseIDDate(p.timestamp);
@@ -756,12 +757,13 @@ function renderPresensiTable() {
     body.innerHTML = rows.map(p => {
         const isTamu = !p.nama || p.nama.toLowerCase() === 'tamu/asing';
         let statusBadge = p.status === "DATANG" ? "badge-success" : (p.status.startsWith("IZIN") ? "badge-info" : "badge-warning");
+        const statusLabel = p.status === 'IZIN (DINAS LUAR)' ? 'Dinas Luar' : p.status;
         return `<tr>
             <td class="td-mono">${p.timestamp}</td>
             <td class="td-mono">${p.rfid}</td>
             <td class="td-name">${isTamu ? '<i style="color:var(--text-muted);font-weight:400">Kartu Tidak Dikenal</i>' : p.nama}</td>
             <td><span class="badge ${isTamu ? 'badge-warning' : 'badge-success'}">${isTamu ? 'TAMU' : p.peran}</span></td>
-            <td><span class="badge ${statusBadge}">${p.status}</span></td>
+            <td><span class="badge ${statusBadge}">${statusLabel}</span></td>
         </tr>`;
     }).join('');
     renderPagination('presensiPagination', filteredPresensi.length, presensiPage, p => { presensiPage = p; renderPresensiTable(); });
@@ -900,7 +902,8 @@ function buildAttendanceMap() {
         } else if (p.status === 'PULANG') {
             times.pulang = timeStr || 'Hadir';
         } else if (p.status.startsWith('IZIN')) {
-            if (p.status.includes('TERLAMBAT')) times.izin = 'TERLAMBAT';
+            if (p.status.includes('DINAS LUAR')) times.izin = 'DINAS_LUAR';
+            else if (p.status.includes('TERLAMBAT')) times.izin = 'TERLAMBAT';
             else if (p.status.includes('PULANG AWAL')) times.izin = 'PULANG_AWAL';
             else times.izin = 'TIDAK_MASUK';
         }
@@ -1011,11 +1014,13 @@ function renderRekap() {
                     hadirCount++;
                     const isLateCount = (() => { const p = times.datang.split(':'); return p.length===2 && (parseInt(p[0])*60+parseInt(p[1])) > (7*60+15); })();
                     if (times.izin === 'TERLAMBAT' || isLateCount) terlambatCount++;
-                    if (times.izin === 'TIDAK_MASUK') izinCount++;
+                    if (times.izin === 'TIDAK_MASUK' || times.izin === 'DINAS_LUAR') izinCount++;
                 }
                 
                 if (hadir) {
-                    if (times.izin === 'TIDAK_MASUK') {
+                    if (times.izin === 'DINAS_LUAR') {
+                        cells += `<td class="${isToday ? 'td-today' : ''}" style="background:#eff6ff;color:#2563eb;font-weight:800;font-size:0.65rem;text-align:center;padding:0.4rem 0.2rem;" title="Dinas Luar">DL</td>`;
+                    } else if (times.izin === 'TIDAK_MASUK') {
                         cells += `<td class="${isToday ? 'td-today' : ''}" style="background:#eff6ff;color:#2563eb;font-weight:800;font-size:0.65rem;text-align:center;padding:0.4rem 0.2rem;" title="Izin Tidak Masuk Kerja">IZIN</td>`;
                     } else {
                         let infoD = times.izin === 'TERLAMBAT' ? ' <span style="color:#d97706;font-size:0.55rem;">(Izin)</span>' : '';
@@ -1120,7 +1125,9 @@ function exportRekapXLSX() {
                 const times = dayMap ? dayMap.get(s.rfid) : null;
                 
                 if (times) {
-                    if (times.izin === 'TIDAK_MASUK') {
+                    if (times.izin === 'DINAS_LUAR') {
+                        statusHari = 'Dinas Luar';
+                    } else if (times.izin === 'TIDAK_MASUK') {
                         statusHari = 'Izin (Tidak Masuk)';
                     } else if (times.izin === 'TERLAMBAT') {
                         statusHari = 'Hadir (Izin Terlambat)';
@@ -1163,9 +1170,10 @@ function exportRekapXLSX() {
             if (isWeekend(d)) return 'LIBUR';
             if (d > today) return '-';
             const k = dateToKey(d);
-            const h = attendanceMap.has(k) && attendanceMap.get(k).has(s.rfid);
+            const times = attendanceMap.has(k) ? attendanceMap.get(k).get(s.rfid) : null;
+            const h = !!times;
             if (h) hadir++;
-            return h ? 'Hadir' : 'Tidak Hadir';
+            return !h ? 'Tidak Hadir' : times.izin === 'DINAS_LUAR' ? 'DL' : 'Hadir';
         });
         const pastWork = dates.filter(d => !isWeekend(d) && d <= today).length;
         const pct = pastWork > 0 ? Math.round((hadir/pastWork)*100) : 0;
@@ -1244,9 +1252,11 @@ function exportRekapPDF() {
                 hadirCount++;
                 const isLateCount = (() => { const p = times.datang.split(':'); return p.length===2 && (parseInt(p[0])*60+parseInt(p[1])) > (7*60+15); })();
                 if (times.izin === 'TERLAMBAT' || isLateCount) terlambatCount++;
-                if (times.izin === 'TIDAK_MASUK') izinCount++;
+                if (times.izin === 'TIDAK_MASUK' || times.izin === 'DINAS_LUAR') izinCount++;
 
-                if (times.izin === 'TIDAK_MASUK') {
+                if (times.izin === 'DINAS_LUAR') {
+                    cells += `<td class="c-izin" title="Dinas Luar">DL</td>`;
+                } else if (times.izin === 'TIDAK_MASUK') {
                     cells += `<td class="c-izin">IZN</td>`;
                 } else {
                     const isLate = (() => { const p = times.datang.split(':'); return p.length===2 && (parseInt(p[0])*60+parseInt(p[1])) > (7*60+15); })();
@@ -1511,7 +1521,7 @@ tbody td.col-pct   { font-weight: 800; }
   </table>
 
   <div class="legend">
-    <span><b style="color:#16a34a">D: 07:xx</b> Tepat waktu</span><span><b style="color:#dc2626">D: 07:xx</b> Terlambat (&gt;07:15)</span><span><b style="color:#2563eb">IZN</b> Izin tidak masuk</span><span><b style="color:#cbd5e1">—</b> Tidak hadir</span><span><b>P:</b> Jam pulang</span>
+    <span><b style="color:#16a34a">D: 07:xx</b> Tepat waktu</span><span><b style="color:#dc2626">D: 07:xx</b> Terlambat (&gt;07:15)</span><span><b style="color:#2563eb">IZN</b> Izin tidak masuk</span><span><b style="color:#2563eb">DL</b> Dinas Luar</span><span><b style="color:#cbd5e1">—</b> Tidak hadir</span><span><b>P:</b> Jam pulang</span>
   </div>
 
   <div class="footer">
